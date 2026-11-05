@@ -1,156 +1,130 @@
-# 1. Configuração do ambiente (Windows Home + VirtualBox + LXD)
+# 1. Configuração do ambiente (Windows Home + Multipass + LXD)
 
 Este guia prepara o ambiente usado no estudo de caso do Trabalho GB
 (Assunto 3: servidores com contêineres LXC/LXD).
 
-O Windows **Home** não tem Hyper-V, então a VM Linux é criada no **VirtualBox**.
-
 Arquitetura final do ambiente:
 
 ```
-Windows Home (host físico)
- └── VirtualBox (hipervisor tipo 2)
-      └── VM Ubuntu Server 24.04 "lxd-host"
-           ├── enp0s3 → NAT       (internet)
-           ├── enp0s8 → Host-only (acesso pelo Windows: 192.168.56.x)
-           └── LXD (gerenciador de contêineres, usa a liblxc)
+Windows 10/11 Home (host físico)
+ └── Plataforma de Máquina Virtual (hipervisor do Windows, API HCS)
+      └── VM Ubuntu 24.04 "lxd-host"  (criada e gerenciada pelo Multipass)
+           └── LXD 6 LTS (gerenciador de contêineres, usa a liblxc)
                 └── lxdbr0 (10.x.x.x) → contêineres Linux (web1, web2, lb, ...)
 ```
+
+> **Por que não VirtualBox?** A partir da versão 1.18, o Multipass não suporta mais
+> o VirtualBox. No Windows ele usa o driver `hcs` (Host Compute System), que funciona
+> nas edições **Home**, Pro e Enterprise. Ele usa a mesma base do WSL2, a
+> **Plataforma de Máquina Virtual**.
 
 ---
 
 ## 1.1 Requisitos
 
-| Item | Mínimo | Recomendado |
-|---|---|---|
-| Sistema | Windows 10/11 Home 64 bits | — |
-| RAM do notebook | 8 GB | 16 GB |
-| Espaço livre em disco | 35 GB | 50 GB |
-| Virtualização na BIOS/UEFI | Ativada (Intel VT-x / AMD-V) | — |
-
-Para conferir se a virtualização está ativada: abra o **Gerenciador de Tarefas →
-Desempenho → CPU** e procure **"Virtualização: Habilitado"**. Se estiver
-desabilitado, ative na BIOS/UEFI (opção *Intel Virtualization Technology*, *VT-x*
-ou *SVM Mode*).
-
----
-
-## 1.2 Baixar e instalar
-
-1. **VirtualBox** (versão 7.x para Windows):
-   <https://www.virtualbox.org/wiki/Downloads> → *Windows hosts*.
-   Instale com as opções padrão (aceite instalar os drivers de rede).
-   Se o instalador pedir *Python Core / win32api*, pode ignorar.
-
-2. **Ubuntu Server 24.04 LTS** (arquivo `.iso`, ~2,6 GB):
-   <https://ubuntu.com/download/server> → *Download Ubuntu Server 24.04 LTS*.
-
----
-
-## 1.3 Conferir a rede Host-only do VirtualBox
-
-A rede Host-only permite que o Windows acesse a VM por um IP fixo
-(`192.168.56.x`), sem depender da rede Wi-Fi.
-
-1. No VirtualBox: **Arquivo → Ferramentas → Gerenciador de Rede**
-   (*File → Tools → Network Manager*), aba **Host-only Networks**.
-2. Deve existir uma rede (ex.: *VirtualBox Host-Only Ethernet Adapter*) com:
-   - IPv4: `192.168.56.1` / máscara `255.255.255.0`
-   - **DHCP Server: habilitado**
-3. Se não existir, clique em **Criar** (*Create*) e confira os valores acima.
-
----
-
-## 1.4 Criar a VM
-
-1. Clique em **Novo** (*New*) e preencha:
-
-   | Campo | Valor |
-   |---|---|
-   | Nome | `lxd-host` |
-   | Imagem ISO | o arquivo `ubuntu-24.04.x-live-server-amd64.iso` |
-   | Tipo / Versão | Linux / Ubuntu (64-bit) |
-   | **Pular instalação desassistida** (*Skip Unattended Installation*) | ✅ **marcar** |
-
-   > Marque essa opção para fazer a instalação manualmente e controlar as escolhas.
-
-2. **Hardware:**
-
-   | Campo | Valor |
-   |---|---|
-   | Memória base | `4096 MB` (use `3072 MB` se o notebook tiver só 8 GB) |
-   | Processadores | `2` |
-
-3. **Disco rígido:** criar um disco virtual de **30 GB** (VDI, alocado dinamicamente).
-
-4. Clique em **Finalizar**.
-
-### Configurar as duas placas de rede
-
-Selecione a VM → **Configurações** (*Settings*) → **Rede** (*Network*):
-
-| Aba | Habilitar | Conectado a | Nome |
-|---|---|---|---|
-| **Adaptador 1** | ✅ | **NAT** | — |
-| **Adaptador 2** | ✅ | **Placa de rede exclusiva de hospedeiro** (*Host-only Adapter*) | *VirtualBox Host-Only Ethernet Adapter* |
-
----
-
-## 1.5 Instalar o Ubuntu Server
-
-Inicie a VM (**Iniciar**). Use as setas e o Enter para navegar no instalador.
-
-| Tela do instalador | O que escolher |
+| Item | Valor |
 |---|---|
-| *Try or Install Ubuntu Server* | Enter |
-| Language | `English` (os comandos e mensagens de erro ficam mais fáceis de pesquisar) |
-| Installer update available | `Continue without updating` |
-| Keyboard configuration | Layout: `Portuguese (Brazil)` (teclado ABNT2) |
-| Type of installation | `Ubuntu Server` |
-| Network configuration | Devem aparecer **duas** interfaces com IP: `enp0s3` (10.0.2.15) e `enp0s8` (192.168.56.x). **Anote o IP da `enp0s8`.** Done |
-| Proxy configuration | Deixar vazio. Done |
-| Ubuntu archive mirror | Aguardar o teste do espelho. Done |
-| Guided storage configuration | `Use an entire disk`, e **desmarcar** `Set up this disk as an LVM group` (assim todo o disco fica disponível) |
-| Storage configuration | Done → Continue |
-| Profile configuration | Nome: o seu · Server name: `lxd-host` · Username: ex. `aluno` · Senha (anote!) |
-| Upgrade to Ubuntu Pro | `Skip for now` |
-| SSH configuration | ✅ **Install OpenSSH server** |
-| Featured server snaps | Não marcar nada. Done |
+| Sistema | Windows 10 ou 11 (Home, Pro ou Enterprise), versão **1809** ou mais nova |
+| Recurso do Windows | **Plataforma de Máquina Virtual** ativada (seção 1.2) |
+| Virtualização na BIOS/UEFI | Ativada (Intel VT-x / AMD-V) |
+| RAM do notebook | 8 GB no mínimo (16 GB recomendado) |
+| Espaço livre em disco | 30 GB no mínimo |
 
-Aguarde a instalação. Quando aparecer **Reboot Now**, selecione e pressione Enter.
-Se aparecer *"Please remove the installation medium"*, apenas pressione Enter
-(o VirtualBox ejeta a ISO sozinho).
-
-Faça login com o usuário e a senha criados.
+Para conferir se a virtualização está ativada na BIOS: abra o **Gerenciador de
+Tarefas → Desempenho → CPU** e procure **"Virtualização: Habilitado"**.
 
 ---
 
-## 1.6 Acessar a VM pelo Windows (SSH)
+## 1.2 Ativar a Plataforma de Máquina Virtual
 
-Usar SSH é bem mais prático que a janela do VirtualBox: dá para copiar e colar
-comandos.
+**Opção A (interface gráfica):**
 
-1. **Na VM**, confira o IP da placa Host-only (`enp0s8`):
+1. Pressione a tecla Windows e digite **"Ativar ou desativar recursos do Windows"**.
+2. Marque **Plataforma de Máquina Virtual** (*Virtual Machine Platform*).
+3. Clique em OK e **reinicie** o computador.
 
-   ```bash
-   ip -4 addr show enp0s8
-   ```
+**Opção B (PowerShell como Administrador):**
 
-   Normalmente é `192.168.56.101`.
+```powershell
+dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+```
 
-2. **No Windows**, abra o **PowerShell** ou o **Terminal** e conecte:
+Depois **reinicie** o computador.
+
+> Se você já usa o WSL2, esse recurso provavelmente já está ativado.
+
+---
+
+## 1.3 Instalar o Multipass
+
+1. Baixe o instalador `.msi` em <https://canonical.com/multipass/download/windows>
+   ou instale pelo PowerShell:
 
    ```powershell
-   ssh aluno@192.168.56.101
+   winget install Canonical.Multipass
    ```
 
-   Na primeira vez, digite `yes` para aceitar a chave e depois a senha.
+2. Execute o instalador (ele pede permissão de Administrador) e siga as telas.
 
-> **Dica:** dá para deixar a VM rodando sem janela: no VirtualBox, clique na seta
-> ao lado de **Iniciar** → **Início sem interface** (*Headless Start*) e use só o SSH.
+3. Abra um **novo** PowerShell e confira:
+
+   ```powershell
+   multipass version
+   ```
+
+   A versão deve ser **1.17 ou mais nova**.
+
+4. Confira se o driver é o `hcs` (o padrão em instalações novas):
+
+   ```powershell
+   multipass get local.driver
+   ```
+
+   Se aparecer `hyperv` (instalação antiga), troque com:
+
+   ```powershell
+   multipass set local.driver=hcs
+   ```
+
+---
+
+## 1.4 Criar a VM Ubuntu
+
+No PowerShell:
+
+```powershell
+multipass launch 24.04 --name lxd-host --cpus 2 --memory 4G --disk 30G
+```
+
+| Parâmetro | Significado | Padrão do Multipass |
+|---|---|---|
+| `24.04` | Ubuntu 24.04 LTS (a mesma versão usada nos tutoriais oficiais do LXD) | última LTS |
+| `--name lxd-host` | Nome da VM | nome aleatório |
+| `--cpus 2` | 2 vCPUs | 1 |
+| `--memory 4G` | 4 GB de RAM (use `3G` se o notebook tiver só 8 GB) | 1G |
+| `--disk 30G` | Disco virtual de 30 GB | 5G (pouco para o LXD) |
+
+> A primeira execução baixa a imagem do Ubuntu e pode demorar alguns minutos.
+
+Confira se a VM está rodando e **anote o IPv4** dela:
+
+```powershell
+multipass list
+```
+
+> **Atenção:** a VM usa a *Default Switch* do Windows, e o IP pode mudar depois
+> de reiniciar o notebook. Sempre confira com `multipass list` antes de usar.
+
+---
+
+## 1.5 Entrar na VM
+
+```powershell
+multipass shell lxd-host
+```
 
 A partir daqui, **todos os comandos são executados dentro da VM** (o prompt fica
-`aluno@lxd-host:~$`).
+`ubuntu@lxd-host:~$`).
 
 Atualize o sistema:
 
@@ -160,18 +134,22 @@ sudo apt update && sudo apt upgrade -y
 
 ---
 
-## 1.7 Instalar o LXD
+## 1.6 Instalar o LXD
 
 ```bash
-sudo snap install lxd
+sudo snap install lxd --channel=6/stable
 ```
 
-> Se aparecer `snap "lxd" is already installed`, está tudo certo.
+> Sem o `--channel`, o snap também instala a LTS atual (track `6`). O parâmetro só
+> deixa a versão explícita. Se aparecer `snap "lxd" is already installed`, confira
+> a versão com `snap list lxd` (a coluna *Tracking* deve mostrar `6/stable`). Se
+> não mostrar, rode `sudo snap refresh lxd --channel=6/stable`.
 
-Dê permissão ao seu usuário para usar o LXD sem `sudo`:
+Dê permissão ao usuário `ubuntu` para usar o LXD sem `sudo`
+(comando da documentação oficial):
 
 ```bash
-sudo usermod -aG lxd $USER
+getent group lxd | grep -qwF "$USER" || sudo usermod -aG lxd "$USER"
 newgrp lxd
 ```
 
@@ -183,33 +161,37 @@ lxd --version
 
 ---
 
-## 1.8 Inicializar o LXD (`lxd init`)
+## 1.7 Inicializar o LXD (`lxd init`)
 
 ```bash
 lxd init
 ```
 
-Respostas sugeridas para as perguntas:
+As perguntas aparecem nesta ordem (LXD 6). Respostas sugeridas:
 
-| Pergunta | Resposta |
-|---|---|
-| Would you like to use LXD clustering? | `no` |
-| Do you want to configure a new storage pool? | `yes` |
-| Name of the new storage pool | `default` |
-| Name of the storage backend to use | `zfs` |
-| Create a new ZFS pool? | `yes` |
-| Would you like to use an existing empty block device? | `no` |
-| Size in GiB of the new loop device | `15GiB` |
-| Would you like to connect to a MAAS server? | `no` |
-| Would you like to create a new local network bridge? | `yes` |
-| What should the new bridge be called? | `lxdbr0` |
-| What IPv4 address should be used? | `auto` |
-| What IPv6 address should be used? | `none` |
-| Would you like the LXD server to be available over the network? | `no` |
-| Would you like stale cached images to be updated automatically? | `yes` |
-| Would you like a YAML "lxd init" preseed to be printed? | `no` |
+| # | Pergunta | Resposta |
+|---|---|---|
+| 1 | Would you like to use LXD clustering? | `no` (Enter) |
+| 2 | Do you want to configure a new storage pool? | `yes` (Enter) |
+| 3 | Name of the new storage pool | `default` (Enter) |
+| 4 | Name of the storage backend to use (...) | `zfs` |
+| 5 | Create a new ZFS pool? | `yes` (Enter) |
+| 6 | Would you like to use an existing empty block device (e.g. a disk or partition)? | `no` (Enter) |
+| 7 | Size in GiB of the new loop device (1GiB minimum) | `15GiB` |
+| 8 | Would you like to create a new local network bridge? | `yes` (Enter) |
+| 9 | What should the new bridge be called? | `lxdbr0` (Enter) |
+| 10 | What IPv4 address should be used? | `auto` (Enter) |
+| 11 | Would you like LXD to NAT IPv4 traffic on your bridge? | `yes` (Enter) |
+| 12 | What IPv6 address should be used? | `none` |
+| 13 | Would you like the LXD server to be available over the network? | `no` (Enter) |
+| 14 | Would you like stale cached images to be updated automatically? | `yes` (Enter) |
+| 15 | Would you like a YAML "lxd init" preseed to be printed? | `no` (Enter) |
 
-> **Atalho (sem perguntas):**
+> - Se aparecer *"Would you like to create an initial LXD UI access link?"*, responda `no`.
+> - Se `zfs` **não** aparecer na lista de backends da pergunta 4, use `btrfs`
+>   (também suporta snapshots e cópias rápidas).
+
+> **Atalho (sem perguntas)**, com os mesmos parâmetros principais:
 > ```bash
 > lxd init --auto --storage-backend zfs --storage-create-loop 15
 > ```
@@ -224,7 +206,7 @@ Respostas sugeridas para as perguntas:
 
 ---
 
-## 1.9 Testar o ambiente
+## 1.8 Testar o ambiente
 
 1. Criar um contêiner de teste:
 
@@ -259,7 +241,8 @@ Respostas sugeridas para as perguntas:
    lxc config device add teste http proxy listen=tcp:0.0.0.0:8080 connect=tcp:127.0.0.1:80
    ```
 
-   No Windows, abra `http://192.168.56.101:8080` (use o IP da sua `enp0s8`).
+   O *proxy device* faz a porta `8080` da VM encaminhar para a porta `80` do contêiner.
+   No Windows, abra `http://<IP-da-VM>:8080` (o IP do `multipass list`).
    Deve aparecer a página **"Welcome to nginx!"**.
 
 6. Apagar o contêiner de teste:
@@ -272,22 +255,37 @@ Se todos os passos funcionaram, o ambiente está pronto para o estudo de caso.
 
 ### Snapshot de segurança da VM
 
-Com tudo funcionando, desligue a VM (`sudo poweroff`) e, no VirtualBox, tire um
-snapshot: selecione a VM → ícone de menu ☰ → **Snapshots** → **Tirar** (*Take*),
-com o nome `lxd-pronto`. Se algo quebrar mais tarde, é só restaurar.
+Com tudo funcionando, tire um snapshot da VM. Ele **só pode ser feito com a VM
+parada**. No PowerShell:
+
+```powershell
+multipass stop lxd-host
+multipass snapshot lxd-host --name lxd-pronto
+multipass start lxd-host
+```
+
+Se algo quebrar mais tarde, restaure com o comando abaixo (ele pergunta se você quer
+salvar o estado atual antes; pode responder `n`):
+
+```powershell
+multipass restore lxd-host.lxd-pronto
+```
 
 ---
 
-## 1.10 Comandos do dia a dia
+## 1.9 Comandos do dia a dia
 
-### Na VM (Ubuntu)
+### Multipass (no PowerShell do Windows)
 
 | Comando | O que faz |
 |---|---|
-| `ip -4 addr show enp0s8` | Mostra o IP da VM na rede Host-only |
-| `sudo poweroff` | Desliga a VM |
-| `sudo reboot` | Reinicia a VM |
-| `df -h` / `free -h` | Espaço em disco / memória livre |
+| `multipass list` | Lista as VMs, o estado e os IPs |
+| `multipass shell lxd-host` | Abre o terminal da VM |
+| `multipass info lxd-host` | Mostra CPU, RAM, disco, IP e snapshots da VM |
+| `multipass stop lxd-host` / `multipass start lxd-host` | Desliga / liga a VM |
+| `multipass snapshot lxd-host --name <nome>` | Snapshot da VM (precisa estar parada) |
+| `multipass restore lxd-host.<nome>` | Volta a VM para um snapshot |
+| `multipass delete lxd-host` + `multipass purge` | Apaga a VM de vez (recomeçar do zero) |
 
 ### LXD (dentro da VM)
 
@@ -299,25 +297,48 @@ com o nome `lxd-pronto`. Se algo quebrar mais tarde, é só restaurar.
 | `lxc stop <nome>` / `lxc start <nome>` | Para / inicia o contêiner |
 | `lxc delete <nome> --force` | Apaga o contêiner |
 | `lxc info <nome>` | Detalhes e uso de recursos |
-| `lxc image list images: ubuntu` | Lista imagens disponíveis |
+| `lxc image list` | Imagens já baixadas (cache local) |
 
 > **Atenção:** o comando `lxc` (sem hífen) é o **cliente do LXD**. Ele não é o
 > mesmo que as ferramentas antigas do LXC puro (`lxc-create`, `lxc-start`, ...).
 
 ---
 
-## 1.11 Problemas comuns
+## 1.10 Problemas comuns
 
 | Problema | Solução |
 |---|---|
-| Erro `VT-x is not available` / `AMD-V is disabled` ao iniciar a VM | Ative a virtualização na BIOS/UEFI do notebook |
-| VM muito lenta e uma **tartaruga verde** no canto da janela da VM | O VirtualBox está rodando sobre a camada do Hyper-V do Windows. Em *Ativar ou desativar recursos do Windows*, desmarque **Plataforma de Máquina Virtual** (desativa o WSL2) e em *Segurança do Windows → Segurança do dispositivo → Isolamento de núcleo*, desative **Integridade da memória**. Reinicie o notebook |
-| Só aparece uma interface de rede no instalador | Confira se o **Adaptador 2** está habilitado como *Host-only* (seção 1.4) |
-| `enp0s8` sem IP (`192.168.56.x`) | Confira se o DHCP da rede Host-only está habilitado (seção 1.3) e rode `sudo netplan apply` |
-| `ssh: connect to host ... Connection timed out` | Confira o IP com `ip -4 addr show enp0s8` e se a VM está ligada |
-| Teclado com acentos/símbolos trocados na janela do VirtualBox | Rode `sudo dpkg-reconfigure keyboard-configuration` ou use o SSH pelo Windows |
-| `permission denied` ao usar `lxc` | Rode `newgrp lxd` ou saia (`exit`) e entre de novo na VM |
+| `multipass launch` falha logo no início | Confira se a **Plataforma de Máquina Virtual** está ativada (seção 1.2) e se a virtualização está habilitada na BIOS |
+| `launch failed: timed out` | Rode o comando de novo; a primeira execução baixa a imagem e pode demorar |
+| VM sem internet ou conexão instável | Antivírus/segurança (Symantec, ESET, Kaspersky, Malwarebytes...) e **VPNs** podem bloquear o tráfego das VMs. Desative temporariamente para testar |
+| Upload muito lento pelo Wi-Fi | No **Gerenciador de Dispositivos → Adaptadores de rede → Hyper-V Virtual Ethernet Adapter → Propriedades → Avançado**, desative *Large Send Offload v2 (IPv4)* e *(IPv6)* |
+| O IP da VM mudou | Normal depois de reiniciar o Windows. Confira com `multipass list` |
+| `permission denied` ao usar `lxc` | Rode `newgrp lxd` ou saia (`exit`) e entre de novo com `multipass shell lxd-host` |
+| `zfs` não aparece no `lxd init` | Use `btrfs` como backend |
 | Contêiner sem IPv4 em `lxc list` | Aguarde alguns segundos e rode `lxc list` de novo; se continuar, `lxc restart <nome>` |
-| Contêiner sem internet | Verifique se a própria VM tem internet (`ping 8.8.8.8`) e `lxc network show lxdbr0` (deve ter `ipv4.nat: "true"`) |
-| Página não abre no navegador do Windows | Confira o proxy device com `lxc config device show <nome>` e se o Nginx está rodando no contêiner |
+| Contêiner sem internet | Verifique se a VM tem internet (`ping 8.8.8.8`) e `lxc network show lxdbr0` (deve ter `ipv4.nat: "true"`) |
+| Página não abre no navegador do Windows | Confira o IP com `multipass list`, o proxy device com `lxc config device show <nome>` e se o Nginx está rodando no contêiner |
 | Falta espaço no storage pool | `lxc storage info default`; apague contêineres e imagens que não usa (`lxc image list`, `lxc image delete <id>`) |
+
+---
+
+## 1.11 Validação nas fontes oficiais
+
+Os passos acima foram conferidos em novembro de 2026 na documentação e no código-fonte oficiais:
+
+| O que foi validado | Fonte |
+|---|---|
+| Windows Home suportado; exige versão 1809+ e Plataforma de Máquina Virtual | Multipass: [install-multipass.md](https://github.com/canonical/multipass/blob/main/docs/how-to-guides/install-multipass.md), [platform.md](https://github.com/canonical/multipass/blob/main/docs/explanation/platform.md) |
+| Driver padrão `hcs`; VirtualBox removido na 1.18; `hyperv` obsoleto na 1.17 | Multipass: [driver.md](https://github.com/canonical/multipass/blob/main/docs/explanation/driver.md), [local-driver.md](https://github.com/canonical/multipass/blob/main/docs/reference/settings/local-driver.md) |
+| Opções `--cpus`, `--memory`, `--disk`, `--name` e imagem `24.04` | Multipass: [launch.md](https://github.com/canonical/multipass/blob/main/docs/reference/command-line-interface/launch.md) |
+| Snapshot só com a VM parada; sintaxe do `restore` (`<vm>.<snapshot>`) e `get local.driver` | Multipass: [snapshot.md](https://github.com/canonical/multipass/blob/main/docs/reference/command-line-interface/snapshot.md), [restore.md](https://github.com/canonical/multipass/blob/main/docs/reference/command-line-interface/restore.md), [get.md](https://github.com/canonical/multipass/blob/main/docs/reference/command-line-interface/get.md) |
+| Acesso pelo navegador do Windows ao IP da VM; rede pela *Default Switch*; antivírus e Wi-Fi | Multipass: [getting-started.md](https://github.com/canonical/multipass/blob/main/docs/tutorial/getting-started.md), [troubleshoot-networking.md](https://github.com/canonical/multipass/blob/main/docs/how-to-guides/troubleshoot/troubleshoot-networking.md) |
+| `snap install lxd` instala a LTS atual (track `6`); comando do grupo `lxd` | LXD: [installing.md](https://github.com/canonical/lxd/blob/main/doc/installing.md), [substitutions.yaml](https://github.com/canonical/lxd/blob/main/doc/substitutions.yaml) |
+| Perguntas e ordem do `lxd init`; flags `--auto`, `--storage-backend`, `--storage-create-loop` | LXD (código, branch `stable-6`): [main_init_interactive.go](https://github.com/canonical/lxd/blob/stable-6/lxd/main_init_interactive.go), [main_init.go](https://github.com/canonical/lxd/blob/stable-6/lxd/main_init.go) |
+| Sintaxe do *proxy device* | LXD: [devices_proxy.md](https://github.com/canonical/lxd/blob/main/doc/reference/devices_proxy.md) |
+| `lxc launch ubuntu:24.04`, `lxc list`, `lxc exec`, `lxc info` | LXD: [first_steps.md](https://github.com/canonical/lxd/blob/main/doc/tutorial/first_steps.md) |
+
+**Itens não confirmados na documentação** (confira na hora):
+
+- O identificador `Canonical.Multipass` no `winget`. Se não funcionar, use o instalador `.msi` do site.
+- Disponibilidade do ZFS no kernel da imagem Ubuntu do Multipass. Por isso o guia indica o `btrfs` como alternativa.
