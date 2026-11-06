@@ -142,6 +142,103 @@ painel pode ser recolhido.
 
 ---
 
+## 4.4.1 Cronômetros de failover
+
+Os comandos que provocam failover ganham um **cronômetro** no painel.
+
+| Comando | O cronômetro começa | O cronômetro para quando |
+|---|---|---|
+| `lxc stop app1 --force` / `lxc pause app1` | evento `instance-stopped` / `instance-paused` do LXD | o HAProxy marca o `app1` como DOWN |
+| `lxc stop lb1 --force` | evento `instance-stopped` | o IP virtual aparece no `lb2` (API do LXD) |
+| `lxc stop db1 --force` | evento `instance-stopped` | o `/cluster` do Patroni mostra outro líder **e** o HAProxy aponta para ele |
+
+- O início vem dos **eventos do LXD**, não do botão. Assim o cronômetro funciona também
+  quando o comando é digitado no terminal (4.4.3).
+- Durante a espera, o painel mostra o que está acontecendo ("aguardando o líder expirar:
+  `ttl` 30 s") para a espera virar explicação.
+- Cada tempo medido vai para uma tabela que pode ser exportada e usada nos slides de
+  conclusão (RTO de cada cenário).
+
+## 4.4.2 Cgroups ao vivo mudando o balanceamento
+
+Objetivo: mudar os limites de CPU do `app1` e do `app2` com `lxc config set` durante a
+apresentação e **ver o balanceamento reagir**.
+
+### Cuidado: com `roundrobin`, o balanceamento não reage
+
+O `roundrobin` distribui as requisições **em rodízio**, sem olhar o desempenho do
+servidor. Com o `app1` limitado a 10 % de CPU, ele continuaria recebendo metade das
+requisições; só ficaria **mais lento**. O que mudaria é o tempo de resposta, não a
+divisão.
+
+Para o efeito aparecer, o backend dos apps usa **`balance leastconn`**: cada requisição
+nova vai para o servidor com **menos conexões abertas**. Um servidor lento segura as
+conexões por mais tempo e, por isso, recebe menos requisições novas.
+
+| Momento | Comando | O que o painel mostra |
+|---|---|---|
+| Início | carga ligada, sem limites | ~50 % / ~50 %; tempos de resposta iguais |
+| Limitar o `app1` | `lxc config set app1 limits.cpu.allowance 10ms/100ms` | barra de CPU do `app1` no teto; tráfego migra para o `app2` (ex.: 15 % / 85 %) |
+| Inverter | limita o `app2`, libera o `app1` | tráfego migra de volta |
+| Comparação | trocar para `roundrobin` (pela API de execução do HAProxy ou recarregando) | divisão volta a 50/50, mas o tempo de resposta do `app1` dispara |
+
+O contraste `roundrobin` × `leastconn` mostra que **o cgroup muda o desempenho** e que
+**o algoritmo de balanceamento decide se isso afeta a divisão**.
+
+### Requisitos para funcionar
+
+- **O app precisa gastar CPU** em cada requisição. Uma rota `/trabalho` que faz um
+  cálculo de ~10–20 ms (ex.: um laço de hash). Sem isso, o limite de CPU quase não
+  muda nada.
+- **Concorrência:** o gerador precisa manter várias requisições **ao mesmo tempo**
+  (ex.: 20). Com uma de cada vez, nunca há "conexões abertas" para o `leastconn` comparar.
+- O app roda com mais de um processo (ex.: `gunicorn -w 2`), para usar a CPU liberada.
+
+## 4.4.3 Gerador de carga
+
+### Opções em Python
+
+| Opção | Como é | Prós | Contras |
+|---|---|---|---|
+| **Script próprio com `asyncio` + `httpx`/`aiohttp`** (recomendado) | ~40 linhas: N tarefas em laço fazendo GET em `/trabalho` e contando respostas por servidor | Integra direto no servidor da apresentação: botões **ligar/desligar**, controle de concorrência, números indo para o painel | Precisa escrever (pouco) |
+| **Locust** (`pip install locust`) | Ferramenta pronta; o comportamento do usuário é uma classe Python | Interface web com gráficos de requisições/s e tempos de resposta; modo sem interface (`--headless`) | É mais uma tela; integrar ao painel exige ler as estatísticas dele |
+| `multiprocessing` + `requests` | Processos fazendo requisições síncronas | Simples de entender | Pesado: um processo por "usuário"; gasta a CPU que queremos medir |
+
+Fora do Python, existem `hey`, `wrk`, `ab` (pacote `apache2-utils`) e `k6`, mas eles só
+mostram o resultado no fim ou no terminal, sem integração com o painel.
+
+**Recomendação:** script próprio com `asyncio`, rodando dentro do servidor da
+apresentação. Cada resposta do app já diz `servidor: app1`, então o gerador conta a
+divisão real das requisições e o tempo de resposta por servidor.
+
+### Onde rodar o gerador
+
+- O gerador manda as requisições para o **IP virtual** (`10.X.Y.10:80`) de dentro da VM,
+  não pelo forward do Windows.
+- Ele **compete pela CPU da VM** com os contêineres. Para não atrapalhar a medição:
+  concorrência moderada (~20) e limites de CPU dos apps bem abaixo da CPU da VM.
+- Opção com mais LXD: rodar o gerador num contêiner próprio (`carga`) com limite de CPU.
+  Isola o gerador por cgroup, mas acrescenta um sétimo contêiner. Decidir no teste.
+
+## 4.4.4 Terminal projetado
+
+Dá para ter um terminal de verdade **dentro da página**, sem alternar janelas:
+
+- **ttyd** (pacote `ttyd` do Ubuntu 24.04, versão 1.7.4): serve um terminal do `lxd-host`
+  pelo navegador. A página o mostra num `iframe`, como uma **gaveta** que abre embaixo
+  (estilo terminal do VS Code), com fonte grande.
+- Tudo o que for digitado aparece no painel, porque o painel lê o estado do LXD (eventos
+  e API), não os botões. Os cronômetros também disparam (4.4.1).
+
+| Cuidado | Solução |
+|---|---|
+| O terminal é um shell completo, diferente dos botões (lista fechada) | `ttyd` escutando só no IP da VM, com senha (`-c usuario:senha`); só existe durante a apresentação |
+| Atalhos do reveal.js (setas, espaço) interferindo na digitação | Com o foco no `iframe` do terminal, as teclas vão para ele; um atalho (ex.: `Esc`) devolve o foco aos slides. Testar |
+| Pouco espaço no projetor (1280×720) | Gaveta recolhível; painel encolhe quando o terminal abre |
+| Erro de digitação ao vivo | Comandos importantes continuam também como botões; o terminal é para mostrar que é "de verdade" e para perguntas da plateia |
+
+---
+
 ## 4.5 Tecnologias sugeridas
 
 | Parte | Sugestão | Por quê |
@@ -150,6 +247,22 @@ painel pode ser recolhido.
 | Servidor | **Python + FastAPI** (ou Flask) | Pouco código; `asyncio` para transmitir a saída dos comandos |
 | Painel | **SVG + JavaScript puro** (D3 opcional) | Posições fixas dos 6 nós; só mudam cores, selos e animações |
 | Saída dos comandos | Server-Sent Events | Mais simples que WebSocket para fluxo só servidor → navegador |
+| Gerador de carga | `asyncio` + `httpx` dentro do servidor | Ver 4.4.3 |
+| Terminal | `ttyd` num `iframe` | Ver 4.4.4 |
+
+### Slides: fonte única
+
+Os slides de teoria e referências são **entregues** junto com o vídeo **e** exibidos
+pelo site durante a apresentação. Para não manter duas versões:
+
+- os slides são escritos **uma vez**, em reveal.js, dentro do site;
+- o arquivo entregue é o **PDF exportado** deles (`?print-pdf` no navegador, ou a
+  ferramenta `decktape`);
+- nos slides com comandos, o PDF mostra o comando e uma saída de exemplo fixa (capturada
+  num ensaio), já que a parte interativa não existe no PDF.
+
+> Se o professor exigir `.pptx`, inverter: escrever no PowerPoint e exibir no site como
+> imagens exportadas. Perde-se a integração com os comandos nesses slides.
 
 ### Alternativas consideradas
 
@@ -206,7 +319,7 @@ Tabela de fechamento sugerida: **"o que cada recurso do LXD fez no projeto"**
 
 | Risco | Mitigação |
 |---|---|
-| Demonstração falhar ao vivo | **Modo gravado:** o servidor grava a sequência de `/status` nos ensaios e o painel reproduz sem os contêineres. Ter também um vídeo curto de cada demo |
+| Demonstração falhar ao vivo | **Vídeo** (já planejado) e **modo gravado:** o servidor grava a sequência de `/status` nos ensaios e o painel reproduz sem os contêineres |
 | Failover de ~30 s parecer "travado" | Mostrar um cronômetro no painel e o `ttl` do Patroni; aproveitar para explicar a espera |
 | Ambiente bagunçado depois de um teste | **Reiniciar cenário:** parar os 6, `lxc restore` de todos no mesmo snapshot (o etcd está nos snapshots, então o estado fica coerente) e ligar de novo |
 | IP da VM mudar depois de reiniciar o Windows | Conferir `multipass list` antes de apresentar; a página usa endereços relativos |
@@ -229,9 +342,19 @@ testado com os 6 contêineres no ar.
 
 ---
 
-## 4.9 Em aberto
+## 4.9 Decisões tomadas
 
-- Os slides vão ser **entregues** em algum formato (PDF, .pptx)? O reveal.js exporta
-  PDF, mas sem a parte interativa.
-- Vai haver uma **projeção do terminal** além da página, ou tudo pela página?
+- **Entregas:** slides de teoria e referências + vídeo + apresentação. Os slides são
+  exibidos pelo site e entregues em PDF (fonte única, 4.5).
+- **Vídeo** de reserva, caso a demonstração ao vivo falhe.
+- **Terminal projetado** dentro da página (ttyd, 4.4.4).
+- **Cronômetros** nos comandos que provocam failover (4.4.1).
+- **Cgroups ao vivo** no `app1`/`app2` com `leastconn` e gerador de carga (4.4.2, 4.4.3).
+
+## 4.10 Em aberto
+
+- O formato exigido para os slides entregues é mesmo PDF, ou precisa ser `.pptx`?
+- Gerador de carga no servidor da apresentação ou num contêiner `carga` próprio?
 - Painel em **SVG simples** ou algo mais elaborado (D3, animações de pacotes)?
+- Conferir na documentação do HAProxy a troca de algoritmo pela API de execução
+  (docs.haproxy.org estava fora da rede desta sessão).

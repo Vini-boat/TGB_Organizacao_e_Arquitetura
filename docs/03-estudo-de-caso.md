@@ -31,7 +31,7 @@ Windows ──► IP da VM :8080 ──(network forward do LXD)──► IP VIRT
                         lb1 (MASTER)                              lb2 (BACKUP)
                         HAProxy + keepalived + etcd               HAProxy + keepalived
                          └──────────────────────┬──────────────────────┘
-                                   :80 round-robin    :5000 só o primário
+                                   :80 leastconn        :5000 só o primário
                                   ┌─────────┴─────────┐
                                 app1                app2
                                   └─────────┬─────────┘
@@ -116,7 +116,7 @@ frontend web
     default_backend apps
 
 backend apps
-    balance roundrobin
+    balance leastconn          # reage a servidores lentos (ver doc 04, seção 4.4.2)
     option httpchk GET /health
     server app1 10.X.Y.21:8000 check
     server app2 10.X.Y.22:8000 check
@@ -212,6 +212,9 @@ Um app web mínimo (por exemplo, Flask na porta 8000) com duas rotas:
 |---|---|
 | `/` | grava uma visita e responde `servidor: app1 \| banco: db1 \| visitas: 42` |
 | `/health` | `200 OK` (usada pelo health check do HAProxy) |
+| `/trabalho` | gasta ~10–20 ms de CPU e responde o nome do servidor; usada pelo gerador de carga para o limite de CPU (cgroup) fazer diferença |
+
+O app roda com `gunicorn -w 2` (dois processos), para aproveitar a CPU liberada.
 
 O app se conecta ao banco por `10.X.Y.10:5000` (IP virtual → HAProxy → primário) e
 abre uma conexão nova a cada requisição, para se recuperar sozinho depois de um failover.
