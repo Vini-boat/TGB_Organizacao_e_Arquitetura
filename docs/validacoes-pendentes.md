@@ -80,7 +80,7 @@ Estão nos documentos com base em conhecimento prévio. Fonte sugerida ao lado.
 | [ ] C3 | VRRP unicast entre `lb1` e `lb2` funciona pela `lxdbr0` | doc 03 |
 | [ ] C4 | Clonar o `db1` com `lxc copy` **antes** de iniciar o Patroni e só trocar nome/IP no `db2` | doc 03 |
 | [ ] C5 | Com `leastconn` + limite de CPU, a divisão do tráfego muda de forma visível | doc 04 |
-| [ ] C6 | O gerador de carga na VM não distorce a medição (ou precisa de um contêiner `carga`) | doc 04 |
+| [ ] C6 | O gerador de carga no Windows alcança a concorrência desejada pelo network forward, e o painel recebe os números dele (`GET`/`POST /carga`) | doc 04 |
 | [ ] C7 | Atalhos do reveal.js não interferem na digitação no terminal (`ttyd` em `iframe`) | doc 04 |
 | [ ] C8 | Restaurar os snapshots dos 6 contêineres juntos deixa Patroni e etcd coerentes | doc 04 |
 | [ ] C9 | Tempos reais de failover (app, balanceador, banco) | doc 03, doc 04 |

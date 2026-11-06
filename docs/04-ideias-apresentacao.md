@@ -200,25 +200,69 @@ O contraste `roundrobin` × `leastconn` mostra que **o cgroup muda o desempenho*
 
 | Opção | Como é | Prós | Contras |
 |---|---|---|---|
-| **Script próprio com `asyncio` + `httpx`/`aiohttp`** (recomendado) | ~40 linhas: N tarefas em laço fazendo GET em `/trabalho` e contando respostas por servidor | Integra direto no servidor da apresentação: botões **ligar/desligar**, controle de concorrência, números indo para o painel | Precisa escrever (pouco) |
+| **Script próprio com `asyncio` + `httpx`/`aiohttp`** (recomendado) | ~40 linhas: N tarefas em laço fazendo GET em `/trabalho` e contando respostas por servidor | Controlado pela página (botões **ligar/desligar**, concorrência) e mandando os números para o painel | Precisa escrever (pouco) |
 | **Locust** (`pip install locust`) | Ferramenta pronta; o comportamento do usuário é uma classe Python | Interface web com gráficos de requisições/s e tempos de resposta; modo sem interface (`--headless`) | É mais uma tela; integrar ao painel exige ler as estatísticas dele |
 | `multiprocessing` + `requests` | Processos fazendo requisições síncronas | Simples de entender | Pesado: um processo por "usuário"; gasta a CPU que queremos medir |
 
 Fora do Python, existem `hey`, `wrk`, `ab` (pacote `apache2-utils`) e `k6`, mas eles só
 mostram o resultado no fim ou no terminal, sem integração com o painel.
 
-**Recomendação:** script próprio com `asyncio`, rodando dentro do servidor da
-apresentação. Cada resposta do app já diz `servidor: app1`, então o gerador conta a
-divisão real das requisições e o tempo de resposta por servidor.
+**Recomendação:** script próprio com `asyncio` + `httpx`. Cada resposta do app já diz
+`servidor: app1`, então o gerador conta a divisão real das requisições e o tempo de
+resposta por servidor.
 
-### Onde rodar o gerador
+### Onde rodar o gerador: no Windows, num venv (decidido)
 
-- O gerador manda as requisições para o **IP virtual** (`10.X.Y.10:80`) de dentro da VM,
-  não pelo forward do Windows.
-- Ele **compete pela CPU da VM** com os contêineres. Para não atrapalhar a medição:
-  concorrência moderada (~20) e limites de CPU dos apps bem abaixo da CPU da VM.
-- Opção com mais LXD: rodar o gerador num contêiner próprio (`carga`) com limite de CPU.
-  Isola o gerador por cgroup, mas acrescenta um sétimo contêiner. Decidir no teste.
+O gerador roda **no Windows**, num ambiente virtual Python próprio, **fora do
+`lxd-host`**. Assim ele não disputa a CPU da VM com os contêineres que estão sendo
+medidos.
+
+```
+Windows                                         lxd-host (VM)
+┌──────────────────────────┐                   ┌─────────────────────────────────┐
+│ venv: gerador.py         │── GET /trabalho ─►│ :8080 → network forward → IP     │
+│  (asyncio + httpx)       │   (~20 ao mesmo   │ virtual :80 → HAProxy → app1/app2│
+│                          │    tempo)         │                                 │
+│                          │◄─ GET /carga ─────│ servidor da apresentação :9000  │
+│                          │   (ligar/desligar,│  (painel e botões)              │
+│                          │    concorrência)  │                                 │
+│                          │── POST /carga ───►│  (números para o painel)        │
+└──────────────────────────┘   estatísticas    └─────────────────────────────────┘
+```
+
+- **Alvo:** `http://<IP-da-VM>:8080/trabalho`, o mesmo caminho de um usuário de verdade
+  (forward → IP virtual → HAProxy).
+- **Controle pela página:** o gerador consulta o servidor da apresentação a cada
+  segundo (`GET /carga`) para saber se deve estar ligado e com qual concorrência. Os
+  botões **ligar/desligar** e o controle de concorrência continuam na página.
+- **Números para o painel:** o gerador envia a cada segundo (`POST /carga`) as
+  requisições/s e o tempo de resposta por servidor. Se esse envio falhar, o painel
+  ainda tem as estatísticas do próprio HAProxy (sessões e tempos por servidor).
+- **Sem a página:** o gerador também funciona sozinho pela linha de comando, com a
+  saída no próprio terminal do Windows (útil para testar e para o vídeo).
+
+### Preparar o venv no Windows (PowerShell)
+
+```powershell
+cd carga
+py -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe gerador.py --alvo http://<IP-da-VM>:8080 --painel http://<IP-da-VM>:9000
+```
+
+> Chamar `.venv\Scripts\python.exe` direto evita o `Activate.ps1`, que costuma ser
+> bloqueado pela política de execução do PowerShell.
+
+### Observações
+
+- O IP da VM pode mudar depois de reiniciar o Windows: por isso `--alvo` e `--painel`
+  são parâmetros, não valores fixos no código.
+- O Windows e a VM **ainda dividem os núcleos físicos** do notebook (o Hyper-V
+  distribui as vCPUs entre eles). Com concorrência moderada (~20) e um gerador
+  assíncrono (um único processo), o efeito é pequeno, mas convém fechar outros
+  programas durante a apresentação.
+- O tempo de resposta medido inclui o caminho Windows → VM (forward e NAT). Para
+  comparar `app1` × `app2` isso não importa, porque o caminho é o mesmo para os dois.
 
 ## 4.4.4 Terminal projetado
 
@@ -247,7 +291,7 @@ Dá para ter um terminal de verdade **dentro da página**, sem alternar janelas:
 | Servidor | **Python + FastAPI** (ou Flask) | Pouco código; `asyncio` para transmitir a saída dos comandos |
 | Painel | **SVG + JavaScript puro** (D3 opcional) | Posições fixas dos 6 nós; só mudam cores, selos e animações |
 | Saída dos comandos | Server-Sent Events | Mais simples que WebSocket para fluxo só servidor → navegador |
-| Gerador de carga | `asyncio` + `httpx` dentro do servidor | Ver 4.4.3 |
+| Gerador de carga | `asyncio` + `httpx`, no Windows, num venv próprio | Ver 4.4.3 |
 | Terminal | `ttyd` num `iframe` | Ver 4.4.4 |
 
 ### Slides: fonte única
@@ -350,11 +394,11 @@ testado com os 6 contêineres no ar.
 - **Terminal projetado** dentro da página (ttyd, 4.4.4).
 - **Cronômetros** nos comandos que provocam failover (4.4.1).
 - **Cgroups ao vivo** no `app1`/`app2` com `leastconn` e gerador de carga (4.4.2, 4.4.3).
+- **Gerador de carga no Windows**, num venv separado, fora do `lxd-host` (4.4.3).
 
 ## 4.10 Em aberto
 
 - O formato exigido para os slides entregues é mesmo PDF, ou precisa ser `.pptx`?
-- Gerador de carga no servidor da apresentação ou num contêiner `carga` próprio?
 - Painel em **SVG simples** ou algo mais elaborado (D3, animações de pacotes)?
 - Conferir na documentação do HAProxy a troca de algoritmo pela API de execução
   (docs.haproxy.org estava fora da rede desta sessão).
