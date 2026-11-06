@@ -20,6 +20,15 @@ Foram tentadas, mas o site estava **fora da rede permitida** da sessão em nuvem
 | [ ] A3 | `docs.haproxy.org` | Se a **API de execução** (*runtime API*) permite trocar o algoritmo de balanceamento sem recarregar. Se não permitir, a demonstração usa recarga do HAProxy | doc 04 (seção 4.4.2) |
 | [ ] A4 | `docs.haproxy.org` | Formato CSV das estatísticas (`/;csv`): nomes das colunas de estado, sessões/s e resultado do health check | doc 04 (seção 4.4, fontes do painel) |
 
+| [ ] A5 | `revealjs.com` | Documentação de destaque de linhas (`/code/`) e exportação para PDF (`/pdf-export/`). **Parcialmente contornado:** conferido no código do pacote `reveal.js` 6.0.2 do npm (ver nota abaixo) | doc 04 (seções 4.3.1 e 4.5) |
+
+> **Conferido no pacote `reveal.js` 6.0.2 (npm), sem o site:** delimitador de passos `|`
+> em `data-line-numbers` (plugin Highlight, exemplo `data-line-numbers="|4,8-11|17|22-24"`
+> no `demo.html`); `data-ln-start-from`; `pdfSeparateFragments` com padrão `true` e
+> `showNotes` com padrão `false` (`js/config.ts`); `?print-pdf` ainda aceito, mas marcado
+> no código como *legacy support*. Falta ver no site qual é a forma atual recomendada de
+> exportar.
+
 > Ao liberar o acesso, verificar também a versão do HAProxy no Ubuntu 24.04
 > (<https://packages.ubuntu.com/noble/haproxy>) e usar a documentação **dessa** versão.
 
@@ -59,7 +68,7 @@ Estão nos documentos com base em conhecimento prévio. Fonte sugerida ao lado.
 | # | Afirmação | Fonte sugerida |
 |---|---|---|
 | [ ] B16 | `ttyd -c usuario:senha` (autenticação básica) e opção para escutar só num endereço | `man ttyd` (Ubuntu noble) |
-| [ ] B17 | Exportação do reveal.js para PDF com `?print-pdf` e com `decktape` | <https://revealjs.com/pdf-export/> |
+| [ ] B17 | Forma atual de exportar o reveal.js para PDF (`?print-pdf` é legado no 6.0.2) e alternativa com `decktape` | <https://revealjs.com/pdf-export/> (ver A5) |
 | [ ] B18 | Locust em modo `--headless` | <https://docs.locust.io/> |
 
 ### Guia de configuração (doc 01), já listados lá

@@ -65,7 +65,23 @@ são derrubados de propósito, e só ele tem acesso ao comando `lxc`.
 
 ## 4.3 Execução dos comandos (o "notebook")
 
-- Cada bloco de comando no slide tem um botão **▶ Executar**.
+- Cada bloco de comando no slide tem um botão **▶ (play) ao lado**, como uma célula de
+  notebook:
+
+  ```
+  ┌──────────────────────────────────────────────┐
+  │ $ lxc stop db1 --force                       │  [▶]
+  └──────────────────────────────────────────────┘
+    saída aparece aqui...                  ✓ 0,8 s
+  ```
+
+  | Estado do botão | Significado |
+  |---|---|
+  | ▶ | pronto para executar |
+  | ■ | executando; clicar interrompe (comandos em laço) |
+  | ✓ / ✗ | terminou com sucesso / com erro (código de saída), com o tempo gasto |
+  | ⏱ | comando que provoca failover: abre o cronômetro (4.4.1) |
+
 - O botão manda **só o identificador** do comando (`/run/derruba-db1`), não o texto.
   O servidor tem uma **lista fechada** de comandos permitidos. Isso evita:
   - executar qualquer coisa vinda do navegador;
@@ -85,6 +101,52 @@ COMANDOS = {
     "uid-map":       ["lxc", "exec", "app1", "--", "cat", "/proc/self/uid_map"],
 }
 ```
+
+## 4.3.1 Configurações nos slides com destaque de linha
+
+As configurações (perfil do LXD, `haproxy.cfg`, `keepalived.conf`, `config.yml` do
+Patroni) aparecem nos slides com **destaque da linha que está sendo explicada**. A cada
+seta do teclado, o destaque passa para o próximo trecho.
+
+Recurso nativo do reveal.js (plugin **Highlight**):
+
+```html
+<pre><code class="language-ini" data-trim data-line-numbers="|1-2|4-6|7|9-10">
+<script type="text/template">
+vrrp_instance VI_1 {
+    state MASTER
+    ...
+</script>
+</code></pre>
+```
+
+- `data-line-numbers="|1-2|4-6|7|9-10"`: cada trecho separado por `|` é um passo.
+  O primeiro passo vazio mostra o arquivo inteiro antes de começar a destacar.
+- Os passos funcionam como *fragments* do reveal.js: a seta avança o destaque antes de
+  avançar o slide, e o bloco rola sozinho até a linha destacada.
+- `<script type="text/template">` evita ter de escapar `<`, `>` e `&` da configuração.
+- **Animação entre slides** (*auto-animate*): dois slides seguidos com o mesmo bloco
+  (`data-id` igual) e uma linha diferente animam a mudança. Serve para mostrar
+  `balance roundrobin` virando `balance leastconn`.
+
+### Fonte única também para as configurações
+
+O servidor da apresentação **lê os arquivos de configuração reais do repositório** (os
+mesmos que os scripts de montagem enviam aos contêineres) e os insere nos slides ao
+gerar a página. Assim, o slide nunca fica diferente do que está rodando.
+
+Cada configuração pode ter, ao lado, um ▶ para mostrar a versão **dentro do contêiner**
+(ex.: `lxc exec lb1 -- cat /etc/keepalived/keepalived.conf`) ou o efeito dela
+(ex.: `lxc exec lb1 -- ip -br a` mostrando o IP virtual).
+
+### No PDF
+
+- Por padrão, o reveal.js gera **uma página por passo de destaque**
+  (`pdfSeparateFragments: true`). Uma configuração com 5 passos viraria 5 páginas.
+- Para a entrega, exportar com `pdfSeparateFragments: false`: **uma página por slide**,
+  com o arquivo inteiro.
+- O botão ▶ não funciona no PDF; os slides com comandos mostram uma saída de exemplo
+  capturada num ensaio (4.5).
 
 ---
 
@@ -389,7 +451,10 @@ testado com os 6 contêineres no ar.
 ## 4.9 Decisões tomadas
 
 - **Entregas:** slides de teoria e referências + vídeo + apresentação. Os slides são
-  exibidos pelo site e entregues em PDF (fonte única, 4.5).
+  exibidos pelo site e entregues em **PDF exportado pelo reveal.js** (fonte única, 4.5).
+- **Botão ▶ ao lado** de cada comando (4.3).
+- **Configurações nos slides com destaque de linha** passo a passo, lidas dos arquivos
+  reais do repositório (4.3.1).
 - **Vídeo** de reserva, caso a demonstração ao vivo falhe.
 - **Terminal projetado** dentro da página (ttyd, 4.4.4).
 - **Cronômetros** nos comandos que provocam failover (4.4.1).
@@ -398,7 +463,6 @@ testado com os 6 contêineres no ar.
 
 ## 4.10 Em aberto
 
-- O formato exigido para os slides entregues é mesmo PDF, ou precisa ser `.pptx`?
 - Painel em **SVG simples** ou algo mais elaborado (D3, animações de pacotes)?
 - Conferir na documentação do HAProxy a troca de algoritmo pela API de execução
   (docs.haproxy.org estava fora da rede desta sessão).
