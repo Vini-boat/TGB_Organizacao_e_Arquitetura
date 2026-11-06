@@ -16,6 +16,23 @@ de health check falham, o IP virtual pula de contêiner e o `db2` ganha a coroa 
 
 ---
 
+## 4.1.1 Princípio: LXC/LXD em primeiro plano
+
+O assunto do trabalho são as **ferramentas LXC/LXD**. Balanceamento e alta
+disponibilidade são o **cenário** onde elas aparecem, não o tema principal.
+
+Regras que decorrem disso:
+
+| Regra | Na prática |
+|---|---|
+| **Todo comando ao vivo é um comando `lxc`** | Falhas são provocadas com `lxc stop`, `lxc pause`, `lxc config set`; inspeção com `lxc list`, `lxc info`, `lxc exec`. HAProxy, Patroni e keepalived aparecem pelo efeito, quase nunca pelo comando |
+| **O painel é a "visão do LXD"** | Cada nó mostra primeiro o que o LXD sabe dele (estado, CPU, memória, processos, IPs, snapshots, perfil) e só depois o papel no cenário (líder, MASTER) |
+| **A linha do tempo vem dos eventos do LXD** | Os eventos de ciclo de vida da API (`instance-stopped`, `instance-paused`, `instance-started`, `snapshot-created`) alimentam a faixa de eventos: é o mesmo fluxo do `lxc monitor` |
+| **A própria apresentação é um cliente do LXD** | O servidor da página fala com a mesma API REST que o comando `lxc`. Vale um slide mostrando isso |
+| **Proporção do tempo** | Cerca de 2/3 sobre LXC/LXD (conceitos, mecanismos do núcleo, recursos da ferramenta); 1/3 sobre o cenário de balanceamento e alta disponibilidade |
+
+---
+
 ## 4.2 Arquitetura da solução
 
 ```
@@ -77,7 +94,10 @@ COMANDOS = {
 
 | Informação | Fonte | Observação |
 |---|---|---|
-| Contêiner ligado/desligado | API do LXD: `/1.0/instances?recursion=1` | Pelo socket `/var/snap/lxd/common/lxd/unix.socket` |
+| Contêiner ligado/parado/**congelado** | API do LXD: `/1.0/instances?recursion=1` | Pelo socket `/var/snap/lxd/common/lxd/unix.socket` |
+| **CPU, memória, nº de processos, tráfego de rede** de cada contêiner | API do LXD: `/1.0/instances/<nome>/state` | São os contadores dos **cgroups** e da interface `veth`: o painel mostra o slide 48 da aula ao vivo |
+| **Eventos** (parou, congelou, ligou, snapshot) | API do LXD: `/1.0/events?type=lifecycle` | Mesmo fluxo do `lxc monitor --type=lifecycle`; alimenta a linha do tempo sem polling |
+| **Snapshots e perfil** de cada contêiner | API do LXD: `/1.0/instances/<nome>?recursion=1` | Mostra no cartão do nó: perfil `db`, 2 snapshots |
 | Quem tem o IP virtual | API do LXD: `/1.0/instances/lbX/state` (endereços da `eth0`) | Mostra o keepalived em ação sem entrar no contêiner |
 | Apps no ar e tráfego por app | HAProxy: `http://lbX:8404/;csv` | Estado do health check e sessões/s de cada servidor |
 | Banco: líder, réplica, *timeline*, atraso | Patroni: `GET /cluster` em qualquer `db` vivo | Um único pedido traz os dois nós |
@@ -101,7 +121,8 @@ COMANDOS = {
 
 | Elemento | Codificação visual |
 |---|---|
-| Contêiner | Verde (ligado), vermelho (parado), amarelo (ligado mas falhando no health check) |
+| Contêiner | Verde (ligado), vermelho (parado), **azul (congelado, `lxc pause`)**, amarelo (ligado mas falhando no health check) |
+| **Cartão do nó (visão do LXD)** | Nome, IP, perfil, barras de **CPU e memória com o limite do cgroup**, nº de processos, nº de snapshots. O papel no cenário (👑 líder, selo do IP virtual) vem por cima |
 | Tráfego real | Linha tracejada animada; espessura e velocidade pela taxa de requisições do HAProxy |
 | Health checks | Pulsos periódicos do `lb` até cada servidor, no intervalo configurado; vermelho quando falha |
 | IP virtual | Selo que muda de `lb1` para `lb2` |
@@ -142,19 +163,42 @@ painel pode ser recolhido.
 
 ## 4.6 Roteiro sugerido
 
+**Parte 1: LXC/LXD (~2/3 do tempo)**
+
 | Bloco | Conteúdo | Comandos ao vivo | Painel |
 |---|---|---|---|
-| 1. Contexto | Da aula: VM × contêiner, ISA × ABI | — | recolhido |
-| 2. Ambiente | Windows → Hyper-V → VM → LXD → contêineres | `lxc list`, `multipass info` | aparece com os 6 verdes |
-| 3. Por dentro do contêiner | Namespaces, cgroups, contêiner sem privilégio | `ps -ef`, `uid_map`, `cpu.max` | — |
-| 4. Montagem com LXD | Perfis, clones CoW, snapshots | `lxc copy`, `zfs list` | — |
-| 5. Balanceamento | HAProxy, round-robin | laço de `curl` | tráfego alternando entre `app1`/`app2` |
-| 6. Falha de app | — | `lxc stop app1 --force` | `app1` vermelho; tráfego todo no `app2` |
-| 7. Falha do balanceador | keepalived, VRRP | `lxc stop lb1 --force` | IP virtual pula para o `lb2` |
-| 8. Falha do banco | Patroni, etcd, quórum | `lxc stop db1 --force` | coroa passa para o `db2` em ~30 s |
-| 9. Volta | `pg_rewind` | `lxc start db1` | `db1` volta como réplica |
-| 10. Limite do projeto | Falha dupla `lb1` + `db1` | os dois `stop` | etcd "1/3 — sem maioria" |
-| 11. Conclusão | Tabela de tempos medidos; limitações | — | — |
+| 1. Contexto | Da aula: VM × contêiner, ISA × ABI; contêiner de sistema × de aplicação (Docker) | — | recolhido |
+| 2. LXC e LXD | LXC = `liblxc` + `lxc-*` (mecanismo); LXD = daemon + API REST + cliente `lxc` (gerenciador); Incus; Proxmox usa LXC | Um contêiner com `lxc-create`/`lxc-attach` (LXC puro) ao lado do mesmo com `lxc launch` | — |
+| 3. Ambiente | Windows → Hyper-V → VM → LXD; `lxd init`: storage pool, bridge, perfil | `lxc storage list`, `lxc network list`, `lxc profile show default` | — |
+| 4. Por dentro do contêiner: namespaces | PID, net, mnt, UTS, user; contêiner sem privilégio | `lxc exec app1 -- ps -ef`, `hostname`, `ip -br a`, `uid_map`; `ps -ef` no host | aparece, ainda sem o cenário |
+| 5. Cgroups ao vivo | Limites de CPU e memória aplicados com o contêiner rodando | `lxc config set app1 limits.cpu.allowance 20ms/100ms` + carga; `cat .../cpu.max` | barra de CPU do `app1` batendo no limite |
+| 6. Congelar ≠ parar | `lxc pause` usa o **freezer** do cgroup: processos existem mas não rodam | `lxc pause app1`, `lxc start app1` | `app1` azul; ver bloco 9 |
+| 7. Montagem com LXD | Perfis, clones CoW, IPs fixos, network forward | `time lxc copy app1 app3`, `zfs list -t all`, `lxc profile show app` | `app3` surge em segundos |
+| 8. Snapshots | Cópia na escrita; o "Reiniciar cenário" da apresentação é um `lxc restore` | `lxc snapshot`, `lxc info app1` (lista os snapshots) | contador de snapshots nos cartões |
+
+**Parte 2: o cenário com balanceamento e alta disponibilidade (~1/3)**
+
+| Bloco | Conteúdo | Comandos ao vivo | Painel |
+|---|---|---|---|
+| 9. Balanceamento | 6 contêineres, HAProxy (brevemente) | laço de `curl`; `lxc pause app1` (congelado não responde ao health check) | tráfego alternando; depois todo no `app2` |
+| 10. Falha do balanceador | keepalived; o IP virtual muda de **namespace de rede** | `lxc stop lb1 --force`; `lxc list` mostra o IP virtual no `lb2` | selo do IP virtual pula |
+| 11. Falha do banco | Patroni + etcd (brevemente: maioria de 3) | `lxc stop db1 --force` | coroa passa para o `db2` em ~30 s; cronômetro |
+| 12. Volta e limite | `lxc start db1` volta como réplica; falha dupla `lb1` + `db1` | `lxc start`, dois `lxc stop` | etcd "1/3 — sem maioria" |
+| 13. Conclusão | O que o LXD deu ao projeto (tabela abaixo), tempos medidos, limitações | — | — |
+
+Tabela de fechamento sugerida: **"o que cada recurso do LXD fez no projeto"**
+
+| Recurso do LXD | Uso no projeto |
+|---|---|
+| Imagens + `lxc launch` | Criar os servidores em segundos |
+| Perfis | Configuração por função (`lb`, `app`, `db`) |
+| `lxc copy` (clone CoW) | `lb2`, `app2`, `db2` a partir dos primeiros |
+| Limites (cgroups) | CPU e memória por contêiner |
+| `lxc pause` (freezer) | Simular servidor travado |
+| Snapshots | Reiniciar o cenário entre os testes |
+| Bridge + IPs fixos + network forward | Rede do cenário e acesso pelo Windows |
+| `boot.autostart` + prioridade | Religar tudo na ordem certa depois de reiniciar a VM |
+| API REST + eventos | Painel da própria apresentação |
 
 ---
 

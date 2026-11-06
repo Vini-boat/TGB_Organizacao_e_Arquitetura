@@ -271,6 +271,10 @@ Com 2 contêineres de cada tipo, só pares de **tipos diferentes** podem ser tol
 | `ps -ef` no `lxd-host` mostrando HAProxy, Patroni e PostgreSQL dos contêineres | Namespace PID; contêiner = processos | 46, 47 |
 | `lxc snapshot` dos 6 antes dos testes de falha | Snapshots | 40 |
 | Network forward da VM para o IP virtual | Encaminhamento de porta | 41 |
+| `lxc pause app1`: simula um servidor **travado** (processos existem mas não executam), diferente de `lxc stop` (desligado) | Freezer do cgroup | 48 |
+| `lxc config set app1 limits.cpu.allowance ...` **com o contêiner rodando**, sob carga | Cgroups aplicados ao vivo | 48 |
+| `boot.autostart` e `boot.autostart.priority`: depois de reiniciar a VM, os `db` (etcd + banco) ligam antes dos `app` e dos `lb` | Ordem de inicialização gerenciada pelo LXD | — |
+| `lxc monitor --type=lifecycle`: eventos de parada/início dos contêineres em tempo real | API de eventos do LXD | — |
 
 ---
 
