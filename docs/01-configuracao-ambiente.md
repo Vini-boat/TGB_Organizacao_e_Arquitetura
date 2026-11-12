@@ -64,10 +64,64 @@ Confira a versão do VirtualBox em **Ajuda → Sobre o VirtualBox**.
 
 ## 1.2 Baixar o Ubuntu Server
 
-**Ubuntu Server 24.04 LTS** (arquivo `.iso`, ~2,6 GB):
-<https://ubuntu.com/download/server> → *Download Ubuntu Server 24.04 LTS*.
+Arquivo: **`ubuntu-24.04.5-live-server-amd64.iso`** (~4,1 GB, a versão mais recente
+da 24.04 em novembro de 2026). Baixar arquivo não precisa de admin.
 
-Baixar arquivo não precisa de admin. Salve numa pasta sua (ex.: `Downloads`).
+### Espelhos no Brasil
+
+São cópias oficiais do mesmo arquivo, listadas pela Canonical em
+<https://launchpad.net/ubuntu/+cdmirrors>. Costumam ser bem mais rápidas que o site
+principal, e as universidades ficam na RNP (rede acadêmica):
+
+| Espelho | Endereço da pasta da 24.04 |
+|---|---|
+| C3SL / UFPR | <http://ubuntu.c3sl.ufpr.br/releases/24.04/> |
+| RNP (PoP-SC) | <https://mirror.pop-sc.rnp.br/mirror/ubuntu-releases/24.04/> |
+| Unicamp | <http://www.las.ic.unicamp.br/pub/ubuntu-releases/24.04/> |
+| UEPG | <https://mirror.uepg.br/ubuntu-releases/24.04/> |
+| Site principal | <https://releases.ubuntu.com/24.04/> |
+
+Se um estiver lento ou fora do ar, tente o próximo.
+
+### Baixar pelo PowerShell, com retomada
+
+O `curl.exe` já vem no Windows 10/11. Com `-C -`, se a conexão cair, rodar o **mesmo
+comando** de novo continua de onde parou, sem perder o que já baixou:
+
+```powershell
+cd "$env:USERPROFILE\Downloads"
+curl.exe -L -C - -O http://ubuntu.c3sl.ufpr.br/releases/24.04/ubuntu-24.04.5-live-server-amd64.iso
+```
+
+> Use `curl.exe` (com `.exe`): no PowerShell antigo, `curl` sozinho é outro comando.
+
+### Torrent
+
+Se houver um cliente de torrent permitido na máquina, o arquivo
+`ubuntu-24.04.5-live-server-amd64.iso.torrent` fica na mesma pasta dos espelhos.
+Redes de instituição costumam bloquear torrent.
+
+### Conferir o arquivo
+
+Um arquivo corrompido faz o instalador falhar no meio. Confira o SHA-256:
+
+```powershell
+(Get-FileHash "$env:USERPROFILE\Downloads\ubuntu-24.04.5-live-server-amd64.iso").Hash
+```
+
+O resultado deve ser (fonte: `SHA256SUMS` em <https://releases.ubuntu.com/24.04/>):
+
+```
+97F3D7FFB032C3EB3B23D2C8BE9CC76E60C2C1F2C0146BA5BA9FE01CAFAE0FD8
+```
+
+Se for diferente, baixe de novo (de preferência de outro espelho).
+
+### Se a rede daqui não der conta
+
+Baixe em outra rede (casa, outro laboratório) e traga num **pendrive de 8 GB ou mais**
+(formatado em exFAT ou NTFS: o FAT32 não aceita arquivos acima de 4 GB). A conferência
+do SHA-256 acima vale do mesmo jeito.
 
 ---
 
@@ -85,7 +139,7 @@ Ajuste o caminho da ISO para o nome exato do arquivo baixado:
 ```powershell
 $vbm  = "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe"
 $base = "$env:USERPROFILE\VirtualBox VMs"
-$iso  = "$env:USERPROFILE\Downloads\ubuntu-24.04.3-live-server-amd64.iso"
+$iso  = "$env:USERPROFILE\Downloads\ubuntu-24.04.5-live-server-amd64.iso"
 & $vbm --version
 ```
 
