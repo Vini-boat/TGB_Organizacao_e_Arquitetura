@@ -234,6 +234,22 @@ O instalador do Ubuntu é interativo, então esta vez a VM abre **com janela**:
 
 Inicie a VM (**Iniciar**). Use as setas e o Enter para navegar no instalador.
 
+> **Antes de começar, desconecte a rede da VM.** Com rede, o instalador baixa
+> atualizações da internet, incluindo centenas de MB de `linux-firmware` (drivers de
+> placas físicas, inúteis numa VM). Sem rede, ele instala só o que está na ISO:
+>
+> ```powershell
+> & $vbm controlvm lxd-host setlinkstate1 off
+> ```
+>
+> Depois do reboot no sistema instalado, reconecte com `setlinkstate1 on` e atualize
+> com `sudo apt update && sudo apt upgrade -y` quando a rede estiver boa.
+
+> **Se o Windows tiver Hyper-V ligado**, o VirtualBox roda no "modo lesma" (no log da
+> VM: `NEM: NEMR3Init: Snail execution mode is active!`, ver seção 1.10). A instalação
+> pode passar de 40–60 minutos. Não é travamento: em **View full log** dá para ver as
+> linhas avançando.
+
 | Tela do instalador | O que escolher |
 |---|---|
 | *Try or Install Ubuntu Server* | Enter |
@@ -456,6 +472,8 @@ Se algo quebrar mais tarde, com a VM desligada:
 | `& $vbm list runningvms` | Lista as VMs ligadas |
 | `& $vbm controlvm lxd-host acpipowerbutton` | Desliga a VM de forma limpa (como apertar o botão) |
 | `& $vbm controlvm lxd-host poweroff` | Desliga na hora (como tirar da tomada; só se travar) |
+| `& $vbm controlvm lxd-host pause` / `resume` | Congela / descongela a VM (continua na memória) |
+| `& $vbm controlvm lxd-host savestate` | Salva o estado no disco e fecha; `startvm` retoma de onde parou |
 | `& $vbm snapshot lxd-host take <nome>` | Snapshot da VM |
 | `& $vbm snapshot lxd-host list` | Lista os snapshots |
 | `& $vbm snapshot lxd-host restore <nome>` | Volta a VM para um snapshot (VM desligada) |
