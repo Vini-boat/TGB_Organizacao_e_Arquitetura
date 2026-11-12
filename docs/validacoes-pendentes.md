@@ -75,8 +75,9 @@ Estão nos documentos com base em conhecimento prévio. Fonte sugerida ao lado.
 
 | # | Afirmação | Fonte sugerida |
 |---|---|---|
-| [ ] B19 | Identificador `Canonical.Multipass` no `winget` | `winget search multipass` no Windows |
-| [ ] B20 | ZFS disponível no núcleo da imagem Ubuntu do Multipass | Teste no ambiente |
+| [ ] B19 | Nomes das opções do `VBoxManage` na versão instalada (as páginas lidas são do código de out/2026; ex.: `--audio-enabled`) | `& $vbm --version` e `& $vbm modifyvm` sem argumentos |
+| [ ] B20 | ZFS disponível no núcleo do Ubuntu Server 24.04 | Teste no ambiente |
+| [ ] B21 | Criar ou alterar rede Host-only no Windows exige administrador (por isso o guia usa só NAT) | Manual do VirtualBox (`virtualbox.org` fora da rede) |
 
 ---
 
@@ -93,3 +94,7 @@ Estão nos documentos com base em conhecimento prévio. Fonte sugerida ao lado.
 | [ ] C7 | Atalhos do reveal.js não interferem na digitação no terminal (`ttyd` em `iframe`) | doc 04 |
 | [ ] C8 | Restaurar os snapshots dos 6 contêineres juntos deixa Patroni e etcd coerentes | doc 04 |
 | [ ] C9 | Tempos reais de failover (app, balanceador, banco) | doc 03, doc 04 |
+| [ ] C10 | **Primeiro teste:** usuário sem admin consegue criar a VM, o disco e as regras de NAT com `VBoxManage` | doc 01 |
+| [ ] C11 | A máquina tem Hyper-V/VBS ligado (tartaruga verde)? Se sim, o desempenho comporta os 6 contêineres? | doc 01, doc 04 |
+| [ ] C12 | O NAT do VirtualBox aguenta a concorrência do gerador de carga sem virar o gargalo | doc 04 |
+| [ ] C13 | A pasta do usuário tem espaço (~30 GB) e não é apagada ao sair (computador de laboratório) | doc 01 |

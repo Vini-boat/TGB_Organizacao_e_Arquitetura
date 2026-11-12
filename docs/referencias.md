@@ -54,8 +54,8 @@ As marcadas com ⭐ são as prioritárias.
 | ⭐ Silva, Rafael & Fonte (2024) | **Mais alinhado ao tema.** Contêiner de sistema (LXD) vs. de aplicação (Docker); LXD com desempenho mais estável |
 | ⭐ Mendes & Duarte (2019) | **Em português (SBC).** Comparativo Docker vs. LXC/LXD |
 | Xavier et al. (2013) | LXC vs. OpenVZ vs. VServer vs. Xen em HPC; autores brasileiros (PUCRS) |
-| Azevedo Neto (2025) | **Em português.** LXC e Docker dentro de VMs (AWS), parecido com o cenário no Multipass |
-| Aqasizade et al. (2024) | Contêineres rodando sobre VMs, a mesma arquitetura do trabalho (Windows → Hyper-V → VM → LXD) |
+| Azevedo Neto (2025) | **Em português.** LXC e Docker dentro de VMs (AWS), parecido com o cenário no VirtualBox |
+| Aqasizade et al. (2024) | Contêineres rodando sobre VMs, a mesma arquitetura do trabalho (Windows → VirtualBox → VM → LXD) |
 | Shrestha (2019) | Dissertação de mestrado (não revisada por pares): KVM vs. LXC/LXD |
 | Canonical (2015) | Benchmark **do próprio fabricante** (LXD vs. KVM); citar deixando isso claro |
 

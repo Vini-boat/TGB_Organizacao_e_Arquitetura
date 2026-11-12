@@ -37,7 +37,7 @@ Regras que decorrem disso:
 
 ```
 Navegador (Windows / projetor)
-   │  http://<IP-da-VM>:9000
+   │  http://localhost:9000  (encaminhado pelo VirtualBox)
    ▼
 ┌──────────────────────────── lxd-host (VM) ────────────────────────────┐
 │                                                                       │
@@ -292,8 +292,8 @@ Windows                                         lxd-host (VM)
 └──────────────────────────┘   estatísticas    └─────────────────────────────────┘
 ```
 
-- **Alvo:** `http://<IP-da-VM>:8080/trabalho`, o mesmo caminho de um usuário de verdade
-  (forward → IP virtual → HAProxy).
+- **Alvo:** `http://localhost:8080/trabalho`, o mesmo caminho de um usuário de verdade
+  (encaminhamento do VirtualBox → forward do LXD → IP virtual → HAProxy).
 - **Controle pela página:** o gerador consulta o servidor da apresentação a cada
   segundo (`GET /carga`) para saber se deve estar ligado e com qual concorrência. Os
   botões **ligar/desligar** e o controle de concorrência continuam na página.
@@ -309,7 +309,7 @@ Windows                                         lxd-host (VM)
 cd carga
 py -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe gerador.py --alvo http://<IP-da-VM>:8080 --painel http://<IP-da-VM>:9000
+.venv\Scripts\python.exe gerador.py --alvo http://localhost:8080 --painel http://localhost:9000
 ```
 
 > Chamar `.venv\Scripts\python.exe` direto evita o `Activate.ps1`, que costuma ser
@@ -317,13 +317,13 @@ py -m venv .venv
 
 ### Observações
 
-- O IP da VM pode mudar depois de reiniciar o Windows: por isso `--alvo` e `--painel`
-  são parâmetros, não valores fixos no código.
-- O Windows e a VM **ainda dividem os núcleos físicos** do notebook (o Hyper-V
+- `--alvo` e `--painel` são parâmetros, não valores fixos no código, para o caso de a
+  porta do Windows precisar mudar (porta ocupada, ver guia 01).
+- O Windows e a VM **ainda dividem os núcleos físicos** do notebook (o VirtualBox
   distribui as vCPUs entre eles). Com concorrência moderada (~20) e um gerador
   assíncrono (um único processo), o efeito é pequeno, mas convém fechar outros
   programas durante a apresentação.
-- O tempo de resposta medido inclui o caminho Windows → VM (forward e NAT). Para
+- O tempo de resposta medido inclui o caminho Windows → VM (NAT do VirtualBox e forward do LXD). O NAT do VirtualBox roda em software e pode limitar a vazão com muita concorrência; por isso a concorrência fica moderada. Para
   comparar `app1` × `app2` isso não importa, porque o caminho é o mesmo para os dois.
 
 ## 4.4.4 Terminal projetado
@@ -338,7 +338,7 @@ Dá para ter um terminal de verdade **dentro da página**, sem alternar janelas:
 
 | Cuidado | Solução |
 |---|---|
-| O terminal é um shell completo, diferente dos botões (lista fechada) | `ttyd` escutando só no IP da VM, com senha (`-c usuario:senha`); só existe durante a apresentação |
+| O terminal é um shell completo, diferente dos botões (lista fechada) | A porta do `ttyd` só é encaminhada para `127.0.0.1` do Windows (guia 01), e ainda com senha (`-c usuario:senha`); só existe durante a apresentação |
 | Atalhos do reveal.js (setas, espaço) interferindo na digitação | Com o foco no `iframe` do terminal, as teclas vão para ele; um atalho (ex.: `Esc`) devolve o foco aos slides. Testar |
 | Pouco espaço no projetor (1280×720) | Gaveta recolhível; painel encolhe quando o terminal abre |
 | Erro de digitação ao vivo | Comandos importantes continuam também como botões; o terminal é para mostrar que é "de verdade" e para perguntas da plateia |
@@ -388,7 +388,7 @@ pelo site durante a apresentação. Para não manter duas versões:
 |---|---|---|---|
 | 1. Contexto | Da aula: VM × contêiner, ISA × ABI; contêiner de sistema × de aplicação (Docker) | — | recolhido |
 | 2. LXC e LXD | LXC = `liblxc` + `lxc-*` (mecanismo); LXD = daemon + API REST + cliente `lxc` (gerenciador); Incus; Proxmox usa LXC | Um contêiner com `lxc-create`/`lxc-attach` (LXC puro) ao lado do mesmo com `lxc launch` | — |
-| 3. Ambiente | Windows → Hyper-V → VM → LXD; `lxd init`: storage pool, bridge, perfil | `lxc storage list`, `lxc network list`, `lxc profile show default` | — |
+| 3. Ambiente | Windows → VirtualBox → VM → LXD; `lxd init`: storage pool, bridge, perfil | `lxc storage list`, `lxc network list`, `lxc profile show default` | — |
 | 4. Por dentro do contêiner: namespaces | PID, net, mnt, UTS, user; contêiner sem privilégio | `lxc exec app1 -- ps -ef`, `hostname`, `ip -br a`, `uid_map`; `ps -ef` no host | aparece, ainda sem o cenário |
 | 5. Cgroups ao vivo | Limites de CPU e memória aplicados com o contêiner rodando | `lxc config set app1 limits.cpu.allowance 20ms/100ms` + carga; `cat .../cpu.max` | barra de CPU do `app1` batendo no limite |
 | 6. Congelar ≠ parar | `lxc pause` usa o **freezer** do cgroup: processos existem mas não rodam | `lxc pause app1`, `lxc start app1` | `app1` azul; ver bloco 9 |
@@ -428,7 +428,7 @@ Tabela de fechamento sugerida: **"o que cada recurso do LXD fez no projeto"**
 | Demonstração falhar ao vivo | **Vídeo** (já planejado) e **modo gravado:** o servidor grava a sequência de `/status` nos ensaios e o painel reproduz sem os contêineres |
 | Failover de ~30 s parecer "travado" | Mostrar um cronômetro no painel e o `ttl` do Patroni; aproveitar para explicar a espera |
 | Ambiente bagunçado depois de um teste | **Reiniciar cenário:** parar os 6, `lxc restore` de todos no mesmo snapshot (o etcd está nos snapshots, então o estado fica coerente) e ligar de novo |
-| IP da VM mudar depois de reiniciar o Windows | Conferir `multipass list` antes de apresentar; a página usa endereços relativos |
+| Computador da apresentação sem admin / com Hyper-V (VirtualBox lento, "tartaruga") | Ensaiar **no mesmo computador**; VM ligada com `--type headless`; se ficar lento demais, apresentar do notebook pessoal ou usar o vídeo |
 | Notebook lento com tudo ligado | VM de 4 GB comporta os 6 contêineres; fechar outros programas; ensaiar no mesmo notebook |
 | Projetor com resolução baixa | Layout testado em 1280×720; fonte grande no painel |
 

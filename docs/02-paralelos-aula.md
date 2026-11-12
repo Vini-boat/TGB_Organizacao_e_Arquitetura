@@ -12,8 +12,8 @@ Ambiente de referência (ver [01-configuracao-ambiente.md](01-configuracao-ambie
 
 ```
 Windows (host físico)
- └── Hyper-V (hipervisor tipo 1, usa VT-x/AMD-V)
-      └── VM Ubuntu "lxd-host" (Multipass)          ← virtualiza a ISA
+ └── VirtualBox (hipervisor tipo 2, usa VT-x/AMD-V)
+      └── VM Ubuntu "lxd-host"                       ← virtualiza a ISA
            └── LXD → liblxc → núcleo do lxd-host     ← virtualiza a ABI
                 └── contêineres (web1, web2, lb, ...)
 ```
@@ -80,22 +80,22 @@ que **Incus ≈ LXD**.
 | Slide (tema) | Paralelo com o trabalho |
 |---|---|
 | **Motivação / consolidação** (13) | `web1`, `web2` e `lb` rodam numa única VM em vez de três máquinas: consolidação com contêineres. |
-| **Interfaces API/ABI/ISA** (16) | Os dois níveis existem no ambiente: a VM Multipass virtualiza a **ISA**; os contêineres LXD virtualizam a **ABI** (chamadas de sistema do núcleo do `lxd-host`). |
+| **Interfaces API/ABI/ISA** (16) | Os dois níveis existem no ambiente: a VM do VirtualBox virtualiza a **ISA**; os contêineres LXD virtualizam a **ABI** (chamadas de sistema do núcleo do `lxd-host`). |
 | **Tipos de VM** (17) | Contêiner = "VM de processo, com ressalvas". A ressalva no LXD: como é contêiner de sistema, tem `systemd` e parece uma VM inteira, mas continua sendo uma árvore de processos. |
 | **Popek e Goldberg** (19) | Um contêiner **não é um VMM**. A *eficiência* é máxima (zero VM exits). A *equivalência* vale só no nível da ABI: não roda Windows nem outro núcleo. |
-| **Tradução binária / paravirtualização / VT-x** (21–25) | O contêiner não precisa de nenhuma das três. Quem usa **VT-x/AMD-V** é o Hyper-V, para a VM `lxd-host`; por isso o guia pede virtualização ativada na BIOS. |
-| **Memória: GVA → GPA → HPA** (27–28) | Um processo dentro do contêiner tem a **mesma** tradução em dois níveis da VM (EPT/SLAT do Hyper-V). O contêiner **não acrescenta** um terceiro nível. |
-| **E/S: emulação / virtio** (29) | A VM Multipass usa dispositivos sintéticos do Hyper-V (VMBus), paravirtualizados. Dentro dela, a rede do contêiner é só um par `veth` ligado à bridge, sem emulação. |
-| **Hipervisor tipo 1 × tipo 2** (32) | O **Hyper-V é tipo 1**: com ele ativo, o próprio Windows vira uma partição sobre o hipervisor. O slide 41 ("com Hyper-V ativo, o VirtualBox roda sobre o Hyper-V") reforça a troca do VirtualBox pelo Multipass com driver `hcs`. |
+| **Tradução binária / paravirtualização / VT-x** (21–25) | O contêiner não precisa de nenhuma das três. Quem usa **VT-x/AMD-V** é o VirtualBox, para a VM `lxd-host`; por isso o guia pede virtualização ativada na BIOS. |
+| **Memória: GVA → GPA → HPA** (27–28) | Um processo dentro do contêiner tem a **mesma** tradução em dois níveis da VM (EPT/SLAT, usado pelo VirtualBox). O contêiner **não acrescenta** um terceiro nível. |
+| **E/S: emulação / virtio** (29) | A VM do VirtualBox usa placa de rede e disco emulados (ou `virtio`, se configurado). Dentro dela, a rede do contêiner é só um par `veth` ligado à bridge, sem emulação. |
+| **Hipervisor tipo 1 × tipo 2** (32) | O **VirtualBox é tipo 2**: roda como programa sobre o Windows. O slide 41 ("com Hyper-V ativo, o VirtualBox roda sobre o Hyper-V") aparece na prática: se a máquina tiver Hyper-V/VBS ligado, o VirtualBox mostra a **tartaruga verde** e fica mais lento (ver guia 01, seção 1.10). Sem permissão de administrador não dá para desligar, então o ambiente mostra o caso do slide. |
 | **KVM e QEMU** (33–34) | `lxc launch ubuntu:24.04 vm1 --vm` cria uma VM QEMU/KVM pelo **mesmo** LXD. Contraste: cada VM é um processo QEMU; os processos de um contêiner aparecem direto no `ps` do `lxd-host` (ex.: o `nginx` do `web1`). |
 | **Proxmox VE** (37) | O Proxmox usa o **LXC direto** (comando `pct`), não o LXD. Mesma `liblxc`, outro gerenciador. |
 | **Composição de uma VM** (39) | Equivalentes no LXD: `.vbox` → `lxc config show web1`; `.vdi` → dataset ZFS no storage pool; `.ova` → `lxc export web1` (tar.gz) ou `lxc publish` (gera uma imagem). |
-| **Snapshots e clones (CoW)** (40) | `lxc snapshot web1 antes`, `lxc restore web1 antes`, `lxc copy web1 web3`. O clone ZFS é instantâneo e **vinculado**, como no slide. Na outra camada, o `multipass snapshot` faz o mesmo para a VM inteira. |
+| **Snapshots e clones (CoW)** (40) | `lxc snapshot web1 antes`, `lxc restore web1 antes`, `lxc copy web1 web3`. O clone ZFS é instantâneo e **vinculado**, como no slide. Na outra camada, o `VBoxManage snapshot lxd-host take` faz o mesmo para a VM inteira. |
 | **Imagens em camadas** (49) | O LXD **não** usa overlay em camadas como o Docker: usa uma imagem base mais um clone CoW por contêiner (ZFS). Mesmo princípio (cópia na escrita), outra implementação. |
-| **Redes virtuais** (41) | A `lxdbr0` com NAT junta os modos "NAT" e "rede interna" do VirtualBox: os contêineres se falam e saem para a internet. O **proxy device** (`listen=tcp:0.0.0.0:8080`) é o encaminhamento de porta do slide (exemplo `ssh -p 2231`). |
+| **Redes virtuais** (41) | A `lxdbr0` com NAT junta os modos "NAT" e "rede interna" do VirtualBox: os contêineres se falam e saem para a internet. O **proxy device** (`listen=tcp:0.0.0.0:8080`) é o encaminhamento de porta do slide (exemplo `ssh -p 2231`), e o próprio ambiente usa o encaminhamento do VirtualBox (`ssh -p 2222 aluno@localhost`): **duas camadas de port forwarding**, uma em cada nível. |
 | **Migração ao vivo** (42) | O LXD faz `lxc move` entre membros de um cluster. Para contêineres, a migração ao vivo depende do CRIU e é limitada; para VMs é mais madura. No trabalho, a **disponibilidade vem da redundância** (réplicas + balanceador), não da migração: duas estratégias para o mesmo objetivo. |
 | **Virtualização aninhada** (43) | **Argumento para a escolha de contêineres.** O `lxd-host` já é uma VM (L1). Uma VM LXD dentro dela seria L2: exigiria VT-x aninhado e `/dev/kvm`, e cada saída passaria pelo L0. Contêineres dispensam isso e têm custo quase nulo dentro da VM. |
-| **Contêineres / VM × contêiner** (45–46) | A tabela de partida e tamanho pode virar **medição própria**: `time lxc launch` × `multipass launch`; `lxc storage info default` / `zfs list` × disco de 30 GB da VM. |
+| **Contêineres / VM × contêiner** (45–46) | A tabela de partida e tamanho pode virar **medição própria**: `time lxc launch` × tempo de boot da VM no VirtualBox; `lxc storage info default` / `zfs list` × disco de 30 GB da VM. |
 | **Namespaces** (47) | Cada linha da tabela pode ser demonstrada (seção 2.4). |
 | **Cgroups** (48) | O exemplo do slide (`cpu.max 20000 100000`, `memory.max 512M`) é **exatamente** o que o LXD gera com os limites da seção 2.4. |
 | **Graus de isolamento / Segurança** (50–52) | No LXD os contêineres são **sem privilégio** por padrão (namespace `user`: root dentro, usuário comum fora), com **AppArmor + seccomp** (a defesa da linha "falha no núcleo" do slide 52). O ambiente ainda tem **defesa em profundidade**: uma fuga do contêiner atinge só a VM `lxd-host`, não o Windows. |
@@ -141,7 +141,7 @@ O clone ocupa quase nada até ser modificado.
 
 ## 2.5 Fio condutor sugerido para a apresentação
 
-1. **Duas camadas, dois níveis de virtualização:** VM (ISA, Hyper-V tipo 1 com VT-x) e
+1. **Duas camadas, dois níveis de virtualização:** VM (ISA, VirtualBox tipo 2 com VT-x) e
    contêiner (ABI, namespaces + cgroups).
 2. **LXC é o mecanismo, LXD é o gerenciador.** Comparar com runc/Docker e com Proxmox/`pct`.
 3. **Por que contêiner dentro de VM:** evita virtualização aninhada, parte em

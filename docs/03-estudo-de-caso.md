@@ -25,7 +25,7 @@ da VM `lxd-host` (ver [01-configuracao-ambiente.md](01-configuracao-ambiente.md)
 ## 3.2 Arquitetura
 
 ```
-Windows ──► IP da VM :8080 ──(network forward do LXD)──► IP VIRTUAL :80
+Windows ──► localhost:8080 ──(VirtualBox NAT)──► VM 10.0.2.15:8080 ──(network forward do LXD)──► IP VIRTUAL :80
                                                 │ keepalived
                          ┌──────────────────────┴──────────────────────┐
                         lb1 (MASTER)                              lb2 (BACKUP)
@@ -222,18 +222,21 @@ O nome do banco vem de `SELECT inet_server_addr()`.
 
 ### Acesso pelo Windows
 
-O acesso usa um **network forward** do LXD na `lxdbr0`: a porta 8080 do IP da VM vai para
-a porta 80 do IP virtual. Diferente do *proxy device*, ele não fica preso a um contêiner
+São duas etapas. O VirtualBox encaminha `localhost:8080` do Windows para a porta 8080
+da VM (guia 01, seção 1.3). Dentro da VM, um **network forward** do LXD na `lxdbr0` leva
+a porta 8080 do IP da VM (`10.0.2.15`, o endereço fixo que o NAT do VirtualBox dá a ela)
+para a porta 80 do IP virtual. Diferente do *proxy device*, ele não fica preso a um contêiner
 e continua funcionando quando o IP virtual muda de `lb`.
 
 ```bash
-lxc network forward create lxdbr0 <IP-da-VM>
-lxc network forward port add lxdbr0 <IP-da-VM> tcp 8080 10.X.Y.10 80
-lxc network forward port add lxdbr0 <IP-da-VM> tcp 8404 10.X.Y.10 8404
+lxc network forward create lxdbr0 10.0.2.15
+lxc network forward port add lxdbr0 10.0.2.15 tcp 8080 10.X.Y.10 80
+lxc network forward port add lxdbr0 10.0.2.15 tcp 8404 10.X.Y.10 8404
 ```
 
-> O IP da VM pode mudar depois de reiniciar o Windows (ver guia 01). Nesse caso, o
-> forward precisa ser recriado com o IP novo.
+> Confira o IP da VM com `ip -4 addr show enp0s3`. No NAT do VirtualBox ele é sempre
+> `10.0.2.15` e não muda ao reiniciar, então o forward é criado uma vez só. No Windows,
+> o site fica em <http://localhost:8080> e as estatísticas em <http://localhost:8404>.
 
 ---
 
@@ -286,7 +289,7 @@ Com 2 contêineres de cada tipo, só pares de **tipos diferentes** podem ser tol
 | # | Teste | Comando | Resultado esperado |
 |---|---|---|---|
 | 1 | Balanceamento | laço de `curl` no PowerShell | `app1` e `app2` alternando |
-| 2 | Estatísticas | navegador em `http://<IP-da-VM>:8404` | Servidores e contagem de requisições |
+| 2 | Estatísticas | navegador em `http://localhost:8404` | Servidores e contagem de requisições |
 | 3 | Estado do banco | `lxc exec db1 -- patronictl -c /etc/patroni/config.yml list` | Leader/Replica, *timeline*, atraso |
 | 4 | Troca planejada | `patronictl ... switchover` | Primário muda sem perda de dados |
 | 5 | Queda de um app | `lxc stop app1 --force` | Só `app2` responde |
@@ -328,7 +331,7 @@ Conferido em novembro de 2026:
 - O keepalived conseguir adicionar o IP virtual dentro de um contêiner **sem privilégio**
   (deveria, porque ele tem `CAP_NET_ADMIN` no próprio namespace de rede).
 - O network forward aceitar o IP virtual como destino (a documentação fala em "IP dentro
-  da sub-rede da bridge", sem exigir que seja de um contêiner) e o IP da VM como endereço
+  da sub-rede da bridge", sem exigir que seja de um contêiner) e o IP da VM (`10.0.2.15`, do NAT do VirtualBox) como endereço
   de escuta. Alternativa: regra de DNAT no `lxd-host`.
 - O formato do arquivo `/etc/default/etcd` e a unidade systemd do Patroni no pacote do
   Ubuntu (a integração do Debian com o `postgresql-common` não pôde ser consultada:
