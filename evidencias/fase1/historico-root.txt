@@ -1,0 +1,231 @@
+# /root/.ash_history da VM incus-host (fase 0 + fase 1), copiado em 14/11/2026
+clear
+vim
+vi
+vi /etc/apk/repositories
+apk update && apk upgrade
+apk add incus incus-client lxcfs btrfs-progs bash curl
+less
+less /etc/rc.conf
+grep "rc_cgroup_mode"
+grep "rc_cgroup_mode" /etc/rc.conf
+vi /etc/rc.conf
+rc-update add cgroups
+rc-update add dbus
+rc-update add lxcfs
+rc-update add incusd
+rc-service cgroups start
+rc-service dbus start
+rc-service lxcfs start
+rc-service incusd start
+addgroup vinibezerra incus
+clear
+incus version
+rc-service incusd status
+incus admin init
+apk add losetup
+incus storage list
+incus network list
+ls -l /var/lib/incus/disks/
+incus admin init
+rc-service incusd status
+incus version
+incus storage list
+incus network list
+incus provile show default
+incus profile show default
+incus admin init --auto --storage-backend btrfs --storage-create-loop 10
+incus storage list
+incus network list
+incus profile show default
+df -h
+cd /
+ls -l
+cd srv
+ls
+ls -l
+vi /etc/ssh/sshd_config
+rc-service sshd restart
+mkdir app
+grep "AllowTcp" /etc/ssh/ssh_config
+vi /etc/ssh/ssh_config
+grep "AllowTcp" /etc/ssh/sshd_config
+rc-service sshd restart
+ls -l /opt
+ls -la ~
+cd ~
+ls -l
+ls -la
+wget -O /dev/null https://update.code.visualstudio.com/api/commits/stable/server-alpine-x64/stable
+wget -O /tmp/vscs.tar.gz https://update.code.visualstudio.com/latest/server-linux-alpine/stable
+ls -l
+exit
+apk add libstdc++ libgcc bash
+exirt
+exit
+apk add python3
+cd /
+cd srv
+ls -l
+chown vinibezerra:vinibezerra app/
+sudo apt update && sudo apt install -y python3-venv
+apt update && sudo apt install -y python3-venv
+apk update && sudo apt install -y python3-venv
+apk update && apk add -y python3-venv
+apk update && apk add python3-venv
+incus list
+incus network list
+incus network set incusbr0 ipv4.address=10.10.10.1/24
+incus network set incusbr0 ipv4.dhcp.ranges=10.10.10.100-10.10.10.200
+incus network show incusbr0
+incus profile list
+incus profile create app
+incus profile sett app limits.cpu=1 limits.memory=256MiB boot.autostart=true
+incus profile set app limits.cpu=1 limits.memory=256MiB boot.autostart=true
+incus profile device add app src disk source=/srv/app path=/opt/app readonly=true
+incus profile create lb
+mkdir lb
+chown vinibezerra:vinibezerra lb
+incus profile set lb limits.cpu=1 limits.memory=256MiB boot.autostart=true
+incus profile device add lb cfg disk source=/srv/lb path=/opt/lb readonly=true
+incus profile show
+incus profile list
+incus profile show app
+incus profile show lb
+clear
+incus init images:ubuntu/24.04 app1 --profile default --profile app
+incus config device override app1 eth0 ipv4.address=10.10.10.21
+incus list
+incus start app1
+incus list
+incus exec app1 -- python3 --version
+incus exec app1 -- ls -l /opt
+incus exec app1 -- ls -l /opt/app
+incus exec app1 -- systemctl enable --now /opt/app/app.service
+incus exec app1 -- systemctl status app
+incus exec app1 -- curl -s localhost:8080/healt
+incus exec app1 -- curl -s localhost:8080/health
+incus exec app1 -- head -1 /opt/app/.venv/bin/uvcorn
+incus exec app1 -- head -1 /opt/app/.venv/bin/uvicorn
+incus show app1
+incus profile show app
+incus profile device add app src disk source=/srv/app path=/src/app readonly=true
+incus stop app1
+incus profile device rm app src
+incus profile device add app src disk source=/srv/app path=/src/app readonly=true
+incus start app1
+incus exec app1 -- ls -l /src
+incus exec app1 -- systemctl status app
+incus stop app1
+incus delete app1
+incus list
+incus init images:ubuntu/24.04 app1 --profile default --profile app
+incus config device override app1 eth0 ipv4.address=10.10.10.21
+incus start app1
+incus exec app1 -- systemctl enable --now /src/app/app.service
+incus exec app1 -- systemctl status app
+incus restart app1
+incus exec app1 -- systemctl status app
+incus exec app1 -- curl -s localhost:8080/health
+incus exec app1 -- curl -s localhost:8080
+incus exec app1 -- curl localhost:8080
+incus exec app1 -- ss -ltnp
+incus exec app1 -- top
+incus exec app1 -- systemctl status app
+incus exec app1 -- systemctl stop app
+incus exec app1 -- systemctl start app
+incus exec app1 -- systemctl status app
+incus exec app1 -- rm -rf /srv/app/.venv
+incus exec app1 -- ls -lh /srv/app
+incus exec app1 -- ls -lh /srv/app/
+incus exec app1 -- apt install -y python3-fastapi python3-uvicorn
+incus exec app1 -- cat /srv/app/app.service
+incus exec app1 -- ls -l /srv
+incus profile show app
+incus stop app1
+incus profile device rm app src
+incus profile device add app src disk source=/srv/app path=/srv/app readonly=true
+incus list
+incus start app1
+incus exec app1 -- ls -l /srv
+incus exec app1 -- cat /srv/app/app.service
+incus exec app1 -- systemctl status app
+incus delete app1 -force
+incus delete app1 --force
+incus init images:ubuntu/24.04 app1 --profile default --profile app
+incus config device override app1 eth0 ipv4.address=10.10.10.21
+incus exec app1 -- /srv/app/deps.sh
+incus start app1
+incus exec app1 -- /srv/app/deps.sh
+incus exec app1 -- bahs /srv/app/deps.sh
+incus exec app1 -- bash /srv/app/deps.sh
+incus exec app1 -- systemctl enable --now /srv/app/app.service
+incus exec app1 -- systemctl status app
+incus exec app1 -- curl localhost:8080
+incus stop app1
+time incus copy app1 app2
+incus list
+incus config device set app2 eth0 ipv4.address=10.10.10.22
+incus list
+incus start app1 app2
+incus list
+incus exec app2 -- curl localhost:8080
+incus init images:ubuntu/24.04 lb1 --profile default --profile lb
+incus config device override lb1 eth0 ipv4.address=10.10.10.11
+incus start lb1
+incus stop lb1
+incus profile show lb
+incus profile device rm lb cfg
+incus profile device add lb cfg disk source=/srv/lb path=/srv/lb readonly=true
+incus start lb1
+incus exec lb1
+incus exec lb1 -- ls -lh /srv
+incus exec lb1 -- ls -lh /srv/lb
+incus exec lb1 -- bash /srv/lb/setup.sh
+incus exec lb1 -- systemctl status haproxy
+incus exec lb1 -- haproxy -c -f /etc/haproxy/haproxy.cfg
+incus delete lb1 --force
+incus init images:ubuntu/24.04 lb1 --profile default --profile lb
+incus config device override lb1 eth0 ipv4.address=10.10.10.11
+incus start lb1
+incus exec lb1 -- bash /srv/lb/setup.sh
+incus exec lb1 -- journalctl -xeu haproxy.service
+incus stop lb1
+incus exec app1 -- curl localhost:8080/health
+incus restar app1 app2
+incus restart app1 app2
+incus exec app1 -- curl localhost:8080/health
+incus list
+incus start lb1
+incus exec lb1 -- systemctl status haproxy
+incus exec lb1 -- haproxy -c -f /etc/haproxy/haproxy.cfg
+incus exec lb1 -- systemctl stop haproxy
+incus exec lb1 -- systemctl start haproxy
+incus exec lb1 -- systemctl status haproxy
+curl -s 10.10.10.11
+incus network list
+incus network foward create incusbr0 10.0.2.15
+incus network forward create incusbr0 10.0.2.15
+incus network forward port add incusbr0 10.0.2.15 tcp 8080 10.10.10.11 80
+incus network forward port add incusbr0 10.0.2.15 tcp 8404 10.10.10.11 8404
+ls
+ls -lh /srv
+incus list
+poweroff
+df -h
+du -h -d1
+cd /
+du -h -d1
+cd /var
+du -h -d1
+cd lib/
+du -h -d1
+cd incus/
+du -h -d1
+cd storage-pools/
+du -h -d1
+cd default/
+du -h -d1
+cd containers
+du -h -d1
+cat /root/.ash_history

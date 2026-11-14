@@ -1,12 +1,14 @@
 # 4. Ideias para a apresentação
 
-> **Status:** proposta, ainda não implementada.
+> **Status:** proposta, ainda não implementada. **Secundário:** só depois que o estudo de
+> caso (doc 03) estiver montado e funcionando. Se faltar tempo, a apresentação é slides
+> comuns + terminal + o vídeo da demonstração.
 
 ## 4.1 Objetivo
 
 Uma apresentação **interativa numa página web**, no estilo de um *notebook*:
 
-1. os slides mostram comandos (`lxc stop db1 --force`, `patronictl list`...) que podem
+1. os slides mostram comandos (`incus stop db1 --force`, `patronictl list`...) que podem
    ser **executados ali mesmo**, com a saída aparecendo logo abaixo;
 2. um **painel de estado ao vivo**, sempre visível, mostra quem está de pé e quem está
    se comunicando com quem (tráfego, health checks, replicação, votos do etcd).
@@ -25,10 +27,10 @@ Regras que decorrem disso:
 
 | Regra | Na prática |
 |---|---|
-| **Todo comando ao vivo é um comando `lxc`** | Falhas são provocadas com `lxc stop`, `lxc pause`, `lxc config set`; inspeção com `lxc list`, `lxc info`, `lxc exec`. HAProxy, Patroni e keepalived aparecem pelo efeito, quase nunca pelo comando |
-| **O painel é a "visão do LXD"** | Cada nó mostra primeiro o que o LXD sabe dele (estado, CPU, memória, processos, IPs, snapshots, perfil) e só depois o papel no cenário (líder, MASTER) |
-| **A linha do tempo vem dos eventos do LXD** | Os eventos de ciclo de vida da API (`instance-stopped`, `instance-paused`, `instance-started`, `snapshot-created`) alimentam a faixa de eventos: é o mesmo fluxo do `lxc monitor` |
-| **A própria apresentação é um cliente do LXD** | O servidor da página fala com a mesma API REST que o comando `lxc`. Vale um slide mostrando isso |
+| **Todo comando ao vivo é um comando `lxc`** | Falhas são provocadas com `incus stop`, `incus pause`, `incus config set`; inspeção com `incus list`, `incus info`, `incus exec`. HAProxy, Patroni e keepalived aparecem pelo efeito, quase nunca pelo comando |
+| **O painel é a "visão do Incus"** | Cada nó mostra primeiro o que o Incus sabe dele (estado, CPU, memória, processos, IPs, snapshots, perfil) e só depois o papel no cenário (líder, MASTER) |
+| **A linha do tempo vem dos eventos do Incus** | Os eventos de ciclo de vida da API (`instance-stopped`, `instance-paused`, `instance-started`, `instance-snapshot-created`) alimentam a faixa de eventos: é o mesmo fluxo do `incus monitor` |
+| **A própria apresentação é um cliente do Incus** | O servidor da página fala com a mesma API REST que o comando `lxc`. Vale um slide mostrando isso |
 | **Proporção do tempo** | Cerca de 2/3 sobre LXC/LXD (conceitos, mecanismos do núcleo, recursos da ferramenta); 1/3 sobre o cenário de balanceamento e alta disponibilidade |
 
 ---
@@ -39,7 +41,7 @@ Regras que decorrem disso:
 Navegador (Windows / projetor)
    │  http://localhost:9000  (encaminhado pelo VirtualBox)
    ▼
-┌──────────────────────────── lxd-host (VM) ────────────────────────────┐
+┌──────────────────────────── incus-host (VM) ────────────────────────────┐
 │                                                                       │
 │  servidor da apresentação (Python, roda NO HOST, fora dos contêineres)│
 │   ├── GET  /            → página (slides + painel)                    │
@@ -47,7 +49,7 @@ Navegador (Windows / projetor)
 │   ├── GET  /stream/<id> → saída do comando em tempo real (SSE)        │
 │   └── GET  /status      → JSON com o estado dos 6 contêineres         │
 │          │                                                            │
-│          ├── API do LXD (socket unix)  → contêiner ligado/desligado,  │
+│          ├── API do Incus (socket unix)  → contêiner ligado/desligado,  │
 │          │                               IPs (quem tem o IP virtual)  │
 │          ├── HAProxy :8404/;csv        → estado e tráfego dos apps/dbs│
 │          ├── Patroni :8008/cluster     → líder, réplica, atraso       │
@@ -57,7 +59,7 @@ Navegador (Windows / projetor)
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-**Decisão importante:** o servidor da apresentação roda **no `lxd-host`, não num
+**Decisão importante:** o servidor da apresentação roda **no `incus-host`, não num
 contêiner**. Ele é o "observador externo": continua funcionando enquanto os contêineres
 são derrubados de propósito, e só ele tem acesso ao comando `lxc`.
 
@@ -70,7 +72,7 @@ são derrubados de propósito, e só ele tem acesso ao comando `lxc`.
 
   ```
   ┌──────────────────────────────────────────────┐
-  │ $ lxc stop db1 --force                       │  [▶]
+  │ $ incus stop db1 --force                       │  [▶]
   └──────────────────────────────────────────────┘
     saída aparece aqui...                  ✓ 0,8 s
   ```
@@ -95,16 +97,16 @@ Exemplo de definição de comando no servidor:
 
 ```python
 COMANDOS = {
-    "derruba-db1":   ["lxc", "stop", "db1", "--force"],
-    "liga-db1":      ["lxc", "start", "db1"],
-    "patroni-list":  ["lxc", "exec", "db2", "--", "patronictl", "-c", "/etc/patroni/config.yml", "list"],
-    "uid-map":       ["lxc", "exec", "app1", "--", "cat", "/proc/self/uid_map"],
+    "derruba-db1":   ["incus", "stop", "db1", "--force"],
+    "liga-db1":      ["incus", "start", "db1"],
+    "patroni-list":  ["incus", "exec", "db2", "--", "patronictl", "-c", "/etc/patroni/16-main.yml", "list"],
+    "uid-map":       ["incus", "exec", "app1", "--", "cat", "/proc/self/uid_map"],
 }
 ```
 
 ## 4.3.1 Configurações nos slides com destaque de linha
 
-As configurações (perfil do LXD, `haproxy.cfg`, `keepalived.conf`, `config.yml` do
+As configurações (perfil do Incus, `haproxy.cfg`, `keepalived.conf`, `16-main.yml` do
 Patroni) aparecem nos slides com **destaque da linha que está sendo explicada**. A cada
 seta do teclado, o destaque passa para o próximo trecho.
 
@@ -136,8 +138,8 @@ mesmos que os scripts de montagem enviam aos contêineres) e os insere nos slide
 gerar a página. Assim, o slide nunca fica diferente do que está rodando.
 
 Cada configuração pode ter, ao lado, um ▶ para mostrar a versão **dentro do contêiner**
-(ex.: `lxc exec lb1 -- cat /etc/keepalived/keepalived.conf`) ou o efeito dela
-(ex.: `lxc exec lb1 -- ip -br a` mostrando o IP virtual).
+(ex.: `incus exec lb1 -- cat /etc/keepalived/keepalived.conf`) ou o efeito dela
+(ex.: `incus exec lb1 -- ip -br a` mostrando o IP virtual).
 
 ### No PDF
 
@@ -156,11 +158,11 @@ Cada configuração pode ter, ao lado, um ▶ para mostrar a versão **dentro do
 
 | Informação | Fonte | Observação |
 |---|---|---|
-| Contêiner ligado/parado/**congelado** | API do LXD: `/1.0/instances?recursion=1` | Pelo socket `/var/snap/lxd/common/lxd/unix.socket` |
-| **CPU, memória, nº de processos, tráfego de rede** de cada contêiner | API do LXD: `/1.0/instances/<nome>/state` | São os contadores dos **cgroups** e da interface `veth`: o painel mostra o slide 48 da aula ao vivo |
-| **Eventos** (parou, congelou, ligou, snapshot) | API do LXD: `/1.0/events?type=lifecycle` | Mesmo fluxo do `lxc monitor --type=lifecycle`; alimenta a linha do tempo sem polling |
-| **Snapshots e perfil** de cada contêiner | API do LXD: `/1.0/instances/<nome>?recursion=1` | Mostra no cartão do nó: perfil `db`, 2 snapshots |
-| Quem tem o IP virtual | API do LXD: `/1.0/instances/lbX/state` (endereços da `eth0`) | Mostra o keepalived em ação sem entrar no contêiner |
+| Contêiner ligado/parado/**congelado** | API do Incus: `/1.0/instances?recursion=1` | Pelo socket `/var/lib/incus/unix.socket` |
+| **CPU, memória, nº de processos, tráfego de rede** de cada contêiner | API do Incus: `/1.0/instances/<nome>/state` | São os contadores dos **cgroups** e da interface `veth`: o painel mostra o slide 48 da aula ao vivo |
+| **Eventos** (parou, congelou, ligou, snapshot) | API do Incus: `/1.0/events?type=lifecycle` | Mesmo fluxo do `incus monitor --type=lifecycle`; alimenta a linha do tempo sem polling |
+| **Snapshots e perfil** de cada contêiner | API do Incus: `/1.0/instances/<nome>?recursion=1` | Mostra no cartão do nó: perfil `db`, 2 snapshots |
+| Quem tem o IP virtual | API do Incus: `/1.0/instances/lbX/state` (endereços da `eth0`) | Mostra o keepalived em ação sem entrar no contêiner |
 | Apps no ar e tráfego por app | HAProxy: `http://lbX:8404/;csv` | Estado do health check e sessões/s de cada servidor |
 | Banco: líder, réplica, *timeline*, atraso | Patroni: `GET /cluster` em qualquer `db` vivo | Um único pedido traz os dois nós |
 | Membros do etcd vivos | etcd: `GET /health` em cada membro | Mostra se ainda há maioria (2 de 3) |
@@ -183,8 +185,8 @@ Cada configuração pode ter, ao lado, um ▶ para mostrar a versão **dentro do
 
 | Elemento | Codificação visual |
 |---|---|
-| Contêiner | Verde (ligado), vermelho (parado), **azul (congelado, `lxc pause`)**, amarelo (ligado mas falhando no health check) |
-| **Cartão do nó (visão do LXD)** | Nome, IP, perfil, barras de **CPU e memória com o limite do cgroup**, nº de processos, nº de snapshots. O papel no cenário (👑 líder, selo do IP virtual) vem por cima |
+| Contêiner | Verde (ligado), vermelho (parado), **azul (congelado, `incus pause`)**, amarelo (ligado mas falhando no health check) |
+| **Cartão do nó (visão do Incus)** | Nome, IP, perfil, barras de **CPU e memória com o limite do cgroup**, nº de processos, nº de snapshots. O papel no cenário (👑 líder, selo do IP virtual) vem por cima |
 | Tráfego real | Linha tracejada animada; espessura e velocidade pela taxa de requisições do HAProxy |
 | Health checks | Pulsos periódicos do `lb` até cada servidor, no intervalo configurado; vermelho quando falha |
 | IP virtual | Selo que muda de `lb1` para `lb2` |
@@ -210,11 +212,11 @@ Os comandos que provocam failover ganham um **cronômetro** no painel.
 
 | Comando | O cronômetro começa | O cronômetro para quando |
 |---|---|---|
-| `lxc stop app1 --force` / `lxc pause app1` | evento `instance-stopped` / `instance-paused` do LXD | o HAProxy marca o `app1` como DOWN |
-| `lxc stop lb1 --force` | evento `instance-stopped` | o IP virtual aparece no `lb2` (API do LXD) |
-| `lxc stop db1 --force` | evento `instance-stopped` | o `/cluster` do Patroni mostra outro líder **e** o HAProxy aponta para ele |
+| `incus stop app1 --force` / `incus pause app1` | evento `instance-stopped` / `instance-paused` do Incus | o HAProxy marca o `app1` como DOWN |
+| `incus stop lb1 --force` | evento `instance-stopped` | o IP virtual aparece no `lb2` (API do Incus) |
+| `incus stop db1 --force` | evento `instance-stopped` | o `/cluster` do Patroni mostra outro líder **e** o HAProxy aponta para ele |
 
-- O início vem dos **eventos do LXD**, não do botão. Assim o cronômetro funciona também
+- O início vem dos **eventos do Incus**, não do botão. Assim o cronômetro funciona também
   quando o comando é digitado no terminal (4.4.3).
 - Durante a espera, o painel mostra o que está acontecendo ("aguardando o líder expirar:
   `ttl` 30 s") para a espera virar explicação.
@@ -223,7 +225,7 @@ Os comandos que provocam failover ganham um **cronômetro** no painel.
 
 ## 4.4.2 Cgroups ao vivo mudando o balanceamento
 
-Objetivo: mudar os limites de CPU do `app1` e do `app2` com `lxc config set` durante a
+Objetivo: mudar os limites de CPU do `app1` e do `app2` com `incus config set` durante a
 apresentação e **ver o balanceamento reagir**.
 
 ### Cuidado: com `roundrobin`, o balanceamento não reage
@@ -240,9 +242,16 @@ conexões por mais tempo e, por isso, recebe menos requisições novas.
 | Momento | Comando | O que o painel mostra |
 |---|---|---|
 | Início | carga ligada, sem limites | ~50 % / ~50 %; tempos de resposta iguais |
-| Limitar o `app1` | `lxc config set app1 limits.cpu.allowance 10ms/100ms` | barra de CPU do `app1` no teto; tráfego migra para o `app2` (ex.: 15 % / 85 %) |
+| Limitar o `app1` | `incus config set app1 limits.cpu.allowance 10ms/100ms` | barra de CPU do `app1` no teto; tráfego migra para o `app2` (ex.: 15 % / 85 %) |
 | Inverter | limita o `app2`, libera o `app1` | tráfego migra de volta |
-| Comparação | trocar para `roundrobin` (pela API de execução do HAProxy ou recarregando) | divisão volta a 50/50, mas o tempo de resposta do `app1` dispara |
+| Comparação | trocar para `roundrobin` **recarregando o HAProxy** (a API de execução não troca o algoritmo: só muda peso e estado de cada servidor, com `set server ... weight` / `state`) | divisão volta a 50/50, mas o tempo de resposta do `app1` dispara |
+
+> O manual do HAProxy 2.8 diz que o `leastconn` "não é muito adequado" para sessões
+> curtas como HTTP: com pouca concorrência, quase nunca há conexões abertas para
+> comparar. Por isso o gerador precisa manter várias requisições simultâneas (abaixo).
+> Se mesmo assim o efeito for fraco, a alternativa é baixar o **peso** do servidor
+> limitado pela API de execução (`set server apps/app1 weight 20%`), que muda a divisão
+> sem recarregar.
 
 O contraste `roundrobin` × `leastconn` mostra que **o cgroup muda o desempenho** e que
 **o algoritmo de balanceamento decide se isso afeta a divisão**.
@@ -276,11 +285,11 @@ resposta por servidor.
 ### Onde rodar o gerador: no Windows, num venv (decidido)
 
 O gerador roda **no Windows**, num ambiente virtual Python próprio, **fora do
-`lxd-host`**. Assim ele não disputa a CPU da VM com os contêineres que estão sendo
+`incus-host`**. Assim ele não disputa a CPU da VM com os contêineres que estão sendo
 medidos.
 
 ```
-Windows                                         lxd-host (VM)
+Windows                                         incus-host (VM)
 ┌──────────────────────────┐                   ┌─────────────────────────────────┐
 │ venv: gerador.py         │── GET /trabalho ─►│ :8080 → network forward → IP     │
 │  (asyncio + httpx)       │   (~20 ao mesmo   │ virtual :80 → HAProxy → app1/app2│
@@ -293,7 +302,7 @@ Windows                                         lxd-host (VM)
 ```
 
 - **Alvo:** `http://localhost:8080/trabalho`, o mesmo caminho de um usuário de verdade
-  (encaminhamento do VirtualBox → forward do LXD → IP virtual → HAProxy).
+  (encaminhamento do VirtualBox → forward do Incus → IP virtual → HAProxy).
 - **Controle pela página:** o gerador consulta o servidor da apresentação a cada
   segundo (`GET /carga`) para saber se deve estar ligado e com qual concorrência. Os
   botões **ligar/desligar** e o controle de concorrência continuam na página.
@@ -323,17 +332,19 @@ py -m venv .venv
   distribui as vCPUs entre eles). Com concorrência moderada (~20) e um gerador
   assíncrono (um único processo), o efeito é pequeno, mas convém fechar outros
   programas durante a apresentação.
-- O tempo de resposta medido inclui o caminho Windows → VM (NAT do VirtualBox e forward do LXD). O NAT do VirtualBox roda em software e pode limitar a vazão com muita concorrência; por isso a concorrência fica moderada. Para
+- O tempo de resposta medido inclui o caminho Windows → VM (NAT do VirtualBox e forward do Incus). O NAT do VirtualBox roda em software e pode limitar a vazão com muita concorrência; por isso a concorrência fica moderada. Para
   comparar `app1` × `app2` isso não importa, porque o caminho é o mesmo para os dois.
 
 ## 4.4.4 Terminal projetado
 
 Dá para ter um terminal de verdade **dentro da página**, sem alternar janelas:
 
-- **ttyd** (pacote `ttyd` do Ubuntu 24.04, versão 1.7.4): serve um terminal do `lxd-host`
-  pelo navegador. A página o mostra num `iframe`, como uma **gaveta** que abre embaixo
+- **ttyd** (pacote `ttyd` do repositório community do Alpine 3.24, versão 1.7.7): serve
+  um terminal do `incus-host` pelo navegador. Rodar com
+  `ttyd -p 7681 -i eth0 -W -c usuario:senha sh`: o **`-W` é obrigatório**, porque sem
+  ele o terminal é só leitura; `-i eth0` prende o ttyd à placa do NAT do VirtualBox. A página o mostra num `iframe`, como uma **gaveta** que abre embaixo
   (estilo terminal do VS Code), com fonte grande.
-- Tudo o que for digitado aparece no painel, porque o painel lê o estado do LXD (eventos
+- Tudo o que for digitado aparece no painel, porque o painel lê o estado do Incus (eventos
   e API), não os botões. Os cronômetros também disparam (4.4.1).
 
 | Cuidado | Solução |
@@ -387,37 +398,111 @@ pelo site durante a apresentação. Para não manter duas versões:
 | Bloco | Conteúdo | Comandos ao vivo | Painel |
 |---|---|---|---|
 | 1. Contexto | Da aula: VM × contêiner, ISA × ABI; contêiner de sistema × de aplicação (Docker) | — | recolhido |
-| 2. LXC e LXD | LXC = `liblxc` + `lxc-*` (mecanismo); LXD = daemon + API REST + cliente `lxc` (gerenciador); Incus; Proxmox usa LXC | Um contêiner com `lxc-create`/`lxc-attach` (LXC puro) ao lado do mesmo com `lxc launch` | — |
-| 3. Ambiente | Windows → VirtualBox → VM → LXD; `lxd init`: storage pool, bridge, perfil | `lxc storage list`, `lxc network list`, `lxc profile show default` | — |
-| 4. Por dentro do contêiner: namespaces | PID, net, mnt, UTS, user; contêiner sem privilégio | `lxc exec app1 -- ps -ef`, `hostname`, `ip -br a`, `uid_map`; `ps -ef` no host | aparece, ainda sem o cenário |
-| 5. Cgroups ao vivo | Limites de CPU e memória aplicados com o contêiner rodando | `lxc config set app1 limits.cpu.allowance 20ms/100ms` + carga; `cat .../cpu.max` | barra de CPU do `app1` batendo no limite |
-| 6. Congelar ≠ parar | `lxc pause` usa o **freezer** do cgroup: processos existem mas não rodam | `lxc pause app1`, `lxc start app1` | `app1` azul; ver bloco 9 |
-| 7. Montagem com LXD | Perfis, clones CoW, IPs fixos, network forward | `time lxc copy app1 app3`, `zfs list -t all`, `lxc profile show app` | `app3` surge em segundos |
-| 8. Snapshots | Cópia na escrita; o "Reiniciar cenário" da apresentação é um `lxc restore` | `lxc snapshot`, `lxc info app1` (lista os snapshots) | contador de snapshots nos cartões |
+| 1b. Um Ubuntu sem núcleo de Ubuntu | Contêiner virtualiza a **ABI**: distribuição Ubuntu sobre o núcleo do Alpine (4.6.1) | `cat /etc/os-release` e `uname -r` no `app1` e no host | recolhido |
+| 2. LXC e Incus | LXC = `liblxc` + `lxc-*` (mecanismo); Incus = daemon `incusd` + API REST + cliente `incus` (gerenciador), fork do LXD; Proxmox usa LXC | Um contêiner com `lxc-create -t download`/`lxc-attach` (LXC puro; no Alpine, `apk add lxc-download`) ao lado do mesmo com `incus launch` | — |
+| 3. Ambiente | Windows → VirtualBox → VM → Incus; `incus admin init`: storage pool, bridge, perfil | `incus storage list`, `incus network list`, `incus profile show default` | — |
+| 4. Por dentro do contêiner: namespaces | PID, net, mnt, UTS, user; contêiner sem privilégio | `incus exec app1 -- ps -ef`, `hostname`, `ip -br a`, `uid_map`; `ps -ef` no host | aparece, ainda sem o cenário |
+| 5. Cgroups ao vivo | Limites de CPU e memória aplicados com o contêiner rodando | `incus config set app1 limits.cpu.allowance 20ms/100ms` + carga; `cat .../cpu.max` | barra de CPU do `app1` batendo no limite |
+| 6. Congelar ≠ parar | `incus pause` usa o **freezer** do cgroup: processos existem mas não rodam | `incus pause app1`, `incus start app1` | `app1` azul; ver bloco 9 |
+| 7. Montagem com Incus | Perfis, clones CoW, IPs fixos, network forward | `time incus copy app1 app3`, `btrfs subvolume list /var/lib/incus/storage-pools/default`, `incus profile show app` | `app3` surge em segundos |
+| 8. Snapshots | Cópia na escrita; o "Reiniciar cenário" da apresentação é um `incus snapshot restore` | `incus snapshot create`, `incus info app1` (lista os snapshots) | contador de snapshots nos cartões |
+
+### 4.6.1 Slide: "um Ubuntu sem núcleo de Ubuntu" (ABI na prática)
+
+Liga o slide 16 da aula (interfaces API/ABI/ISA) ao ambiente real: a VM é **Alpine**, os
+contêineres do estudo de caso são **Ubuntu 24.04**, e o núcleo é um só (doc 02, 2.2.1).
+
+**Montagem do slide:** à esquerda, a pilha de interfaces do slide 16 (aplicações → API →
+bibliotecas → ABI → SO → ISA → hardware); à direita, a mesma pilha preenchida com o
+ambiente, com uma linha cortando na altura da ABI:
+
+```
+        app1 (contêiner)                     incus-host (VM)
+  ┌───────────────────────────┐
+  │ gunicorn, PostgreSQL      │  ← binários compilados para Ubuntu
+  │ glibc, apt, systemd       │  ← espaço de usuário do Ubuntu 24.04
+  ├────────── ABI ────────────┤  ← chamadas de sistema do Linux (estáveis)
+  │ núcleo Linux 6.18 (Alpine)│  ← o MESMO núcleo da VM
+  ├────────── ISA ────────────┤  ← x86-64, virtualizada pelo VirtualBox (VT-x)
+  │ hardware virtual          │
+  └───────────────────────────┘
+```
+
+**Demonstração (3 comandos, ▶ ou terminal):**
+
+```
+incus exec app1 -- cat /etc/os-release   # PRETTY_NAME="Ubuntu 24.04..."
+incus exec app1 -- uname -r              # 6.18.x-0-virt
+uname -r                                 # 6.18.x-0-virt  (no incus-host)
+```
+
+**Fala sugerida:** "Lá dentro tem `apt`, `systemd` e os pacotes do Ubuntu. Mas o núcleo
+é o do Alpine. Funciona porque o Ubuntu só fala com o núcleo pela ABI, que o Linux
+mantém estável. É o que o slide 16 diz: o contêiner virtualiza a ABI. A VM, uma camada
+abaixo, virtualiza a ISA."
+
+**Ganchos com a aula:**
+
+| Slide da aula | Gancho |
+|---|---|
+| 16 (Interfaces API/ABI/ISA) | o corte acontece na ABI: tudo acima é Ubuntu, tudo abaixo é o host |
+| 17 (Tipos de VM) | contêiner = "VM de processo, com ressalvas": mesma ISA, ABI compartilhada |
+| 46 (VM × contêiner, "mesmo núcleo do hospedeiro") | dá para trocar a distribuição, não o núcleo: nada de Windows nem de módulo de núcleo próprio |
+| 49 (Imagens em camadas) | a imagem Ubuntu tem só o sistema de arquivos (~142 MB, sem núcleo); os 6 contêineres são clones CoW dela |
+| 52 (Segurança, "falha no núcleo atinge todos") | os 6 contêineres Ubuntu dependem do núcleo e das proteções do **Alpine** (sem AppArmor, doc 02) |
+
+**Contraste para fechar:** o mesmo `incus launch` com `--vm` traria o núcleo do Ubuntu
+junto (VM QEMU/KVM), e aí `uname -r` mudaria. No ambiente isso exigiria virtualização
+aninhada (slide 43), por isso fica só como comentário.
 
 **Parte 2: o cenário com balanceamento e alta disponibilidade (~1/3)**
 
 | Bloco | Conteúdo | Comandos ao vivo | Painel |
 |---|---|---|---|
-| 9. Balanceamento | 6 contêineres, HAProxy (brevemente) | laço de `curl`; `lxc pause app1` (congelado não responde ao health check) | tráfego alternando; depois todo no `app2` |
-| 10. Falha do balanceador | keepalived; o IP virtual muda de **namespace de rede** | `lxc stop lb1 --force`; `lxc list` mostra o IP virtual no `lb2` | selo do IP virtual pula |
-| 11. Falha do banco | Patroni + etcd (brevemente: maioria de 3) | `lxc stop db1 --force` | coroa passa para o `db2` em ~30 s; cronômetro |
-| 12. Volta e limite | `lxc start db1` volta como réplica; falha dupla `lb1` + `db1` | `lxc start`, dois `lxc stop` | etcd "1/3 — sem maioria" |
-| 13. Conclusão | O que o LXD deu ao projeto (tabela abaixo), tempos medidos, limitações | — | — |
+| 9. Balanceamento | 6 contêineres, HAProxy (brevemente) | laço de `curl`; `incus pause app1` (congelado não responde ao health check) | tráfego alternando; depois todo no `app2` |
+| 10. Falha do balanceador | keepalived; o IP virtual muda de **namespace de rede** | `incus stop lb1 --force`; `incus list` mostra o IP virtual no `lb2` | selo do IP virtual pula |
+| 11. Falha do banco | Patroni + etcd (brevemente: maioria de 3) | `incus stop db1 --force` | coroa passa para o `db2` em ~30 s; cronômetro |
+| 12. Volta e limite | `incus start db1` volta como réplica; falha dupla `lb1` + `db1` | `incus start`, dois `incus stop` | etcd "1/3 — sem maioria" |
+| 13. Conclusão | O que o Incus deu ao projeto (tabela abaixo), tempos medidos, limitações | — | — |
 
-Tabela de fechamento sugerida: **"o que cada recurso do LXD fez no projeto"**
+Tabela de fechamento sugerida: **"o que cada recurso do Incus fez no projeto"**
 
-| Recurso do LXD | Uso no projeto |
+| Recurso do Incus | Uso no projeto |
 |---|---|
-| Imagens + `lxc launch` | Criar os servidores em segundos |
+| Imagens + `incus launch` | Criar os servidores em segundos |
 | Perfis | Configuração por função (`lb`, `app`, `db`) |
-| `lxc copy` (clone CoW) | `lb2`, `app2`, `db2` a partir dos primeiros |
+| `incus copy` (clone CoW) | `lb2`, `app2`, `db2` a partir dos primeiros |
 | Limites (cgroups) | CPU e memória por contêiner |
-| `lxc pause` (freezer) | Simular servidor travado |
+| `incus pause` (freezer) | Simular servidor travado |
 | Snapshots | Reiniciar o cenário entre os testes |
 | Bridge + IPs fixos + network forward | Rede do cenário e acesso pelo Windows |
 | `boot.autostart` + prioridade | Religar tudo na ordem certa depois de reiniciar a VM |
 | API REST + eventos | Painel da própria apresentação |
+
+---
+
+## 4.6.2 Lição da montagem: `apt upgrade` desfaz o copy-on-write
+
+O que aconteceu: rodar `apt upgrade` dentro dos contêineres fez cada um ocupar **~700 MB
+próprios**, só com os pacotes atualizados. Já na fase 1 (3 contêineres) o `.ova` da VM
+ficou com **2 GB**; com 6 contêineres, o disco da VM (VDI dinâmico) cresceria demais.
+Evidência: `btrfs filesystem du` antes e depois de recriar (doc 05, 1.13, itens 1 e 5).
+
+Por quê: cada contêiner nasce como **clone CoW** da imagem Ubuntu no btrfs e, no começo,
+compartilha todos os blocos com ela (por isso o clone é instantâneo e quase não ocupa
+espaço). O `apt upgrade` reescreve centenas de arquivos de `/usr`, e cada bloco
+reescrito vira **cópia própria** daquele contêiner. Os 6 atualizam os mesmos pacotes,
+mas cada um paga a sua cópia: o compartilhamento se perde. E o VDI dinâmico só cresce:
+apagar arquivos depois não devolve o espaço ao Windows.
+
+Decisão: **recriar** os contêineres (e a VM) **sem `apt upgrade`**, só com
+`apt update` + `apt install` do que cada função precisa. O VDI fica pequeno e o
+`.ova` continua fácil de copiar.
+
+**Gancho com a aula:** slides 40 (snapshots e clones) e 49 (imagens em camadas). O
+ganho do CoW vale enquanto ninguém escreve; o custo aparece por contêiner, na escrita.
+É o mesmo motivo de, no Docker, a atualização ir para uma **imagem nova** em vez de
+cada contêiner se atualizar sozinho.
 
 ---
 
@@ -427,9 +512,9 @@ Tabela de fechamento sugerida: **"o que cada recurso do LXD fez no projeto"**
 |---|---|
 | Demonstração falhar ao vivo | **Vídeo** (já planejado) e **modo gravado:** o servidor grava a sequência de `/status` nos ensaios e o painel reproduz sem os contêineres |
 | Failover de ~30 s parecer "travado" | Mostrar um cronômetro no painel e o `ttl` do Patroni; aproveitar para explicar a espera |
-| Ambiente bagunçado depois de um teste | **Reiniciar cenário:** parar os 6, `lxc restore` de todos no mesmo snapshot (o etcd está nos snapshots, então o estado fica coerente) e ligar de novo |
+| Ambiente bagunçado depois de um teste | **Reiniciar cenário:** parar os 6, `incus snapshot restore` de todos no mesmo snapshot (o etcd está nos snapshots, então o estado fica coerente) e ligar de novo |
 | Computador da apresentação sem admin / com Hyper-V (VirtualBox lento, "tartaruga") | Ensaiar **no mesmo computador**; VM ligada com `--type headless`; se ficar lento demais, apresentar do notebook pessoal ou usar o vídeo |
-| Notebook lento com tudo ligado | VM de 4 GB comporta os 6 contêineres; fechar outros programas; ensaiar no mesmo notebook |
+| Notebook lento com tudo ligado | VM Alpine de 2–3 GB comporta os 6 contêineres (doc 03, T17); fechar outros programas; ensaiar no mesmo notebook |
 | Projetor com resolução baixa | Layout testado em 1280×720; fonte grande no painel |
 
 ---
@@ -459,10 +544,12 @@ testado com os 6 contêineres no ar.
 - **Terminal projetado** dentro da página (ttyd, 4.4.4).
 - **Cronômetros** nos comandos que provocam failover (4.4.1).
 - **Cgroups ao vivo** no `app1`/`app2` com `leastconn` e gerador de carga (4.4.2, 4.4.3).
-- **Gerador de carga no Windows**, num venv separado, fora do `lxd-host` (4.4.3).
+- **Gerador de carga no Windows**, num venv separado, fora do `incus-host` (4.4.3).
+- **Contêineres sem `apt upgrade`**, para não perder o compartilhamento CoW nem inchar
+  o VDI (4.6.2).
 
 ## 4.10 Em aberto
 
 - Painel em **SVG simples** ou algo mais elaborado (D3, animações de pacotes)?
-- Conferir na documentação do HAProxy a troca de algoritmo pela API de execução
-  (docs.haproxy.org estava fora da rede desta sessão).
+- Comparação `roundrobin` × `leastconn` por recarga do HAProxy ou por peso na API de
+  execução (4.4.2): decidir depois do teste T10 do doc 03.

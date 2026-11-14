@@ -55,7 +55,7 @@ As marcadas com ⭐ são as prioritárias.
 | ⭐ Mendes & Duarte (2019) | **Em português (SBC).** Comparativo Docker vs. LXC/LXD |
 | Xavier et al. (2013) | LXC vs. OpenVZ vs. VServer vs. Xen em HPC; autores brasileiros (PUCRS) |
 | Azevedo Neto (2025) | **Em português.** LXC e Docker dentro de VMs (AWS), parecido com o cenário no VirtualBox |
-| Aqasizade et al. (2024) | Contêineres rodando sobre VMs, a mesma arquitetura do trabalho (Windows → VirtualBox → VM → LXD) |
+| Aqasizade et al. (2024) | Contêineres rodando sobre VMs, a mesma arquitetura do trabalho (Windows → VirtualBox → VM → Incus) |
 | Shrestha (2019) | Dissertação de mestrado (não revisada por pares): KVM vs. LXC/LXD |
 | Canonical (2015) | Benchmark **do próprio fabricante** (LXD vs. KVM); citar deixando isso claro |
 
@@ -76,6 +76,7 @@ As marcadas com ⭐ são as prioritárias.
 ## 5. Documentação oficial e material prático
 
 - CANONICAL. **LXD documentation**. Disponível em: <https://documentation.ubuntu.com/lxd/>. (Instâncias, perfis, storage, redes, clustering.)
+- LINUX CONTAINERS. **Incus documentation**. Disponível em: <https://linuxcontainers.org/incus/docs/main/>. (Ferramenta usada no trabalho: instâncias, perfis, storage, redes, eventos.)
 - LINUX CONTAINERS. **LXC e Incus**. Disponível em: <https://linuxcontainers.org/>.
 - HAPROXY TECHNOLOGIES. **HAProxy documentation**. Disponível em: <https://docs.haproxy.org/>. (Algoritmos de balanceamento e *health checks*.)
 - Tutorial: **Conquer the Web with a Powerful Server Squad: Building a Load-Balanced LXC/LXD Container Cluster**. Hashnode. Disponível em: <https://hashnode.com/posts/conquer-the-web-with-a-powerful-server-squad/63de17af2f21c58845cbdb6a>. (Cenário parecido com o estudo de caso.)

@@ -1,0 +1,3 @@
+# Imagens de VM (grandes demais para o git)
+*.ova
+*.vdi

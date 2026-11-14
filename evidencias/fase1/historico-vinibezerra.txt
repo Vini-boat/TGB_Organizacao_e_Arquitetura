@@ -1,0 +1,73 @@
+# ~/.ash_history do usuário vinibezerra na VM incus-host, copiado em 14/11/2026
+quit
+exit
+sudo su -
+su -
+top
+exit
+ls -l
+ls -la
+rm -rf .vscode-*
+ls -l
+ls -la
+cd .vscode-server/
+ls -l
+cd cli/
+ls -l
+cd servers/
+ls -l
+cd ../../
+ls
+ls -l
+ls -la
+tail -n 50 .cli.69047191fc427f2f92828279aae1d90d8eeda7ab.log
+apk add libstdc++ libgcc bash
+su -
+py --version
+py
+bash
+python3
+python3 -m venv .venv
+activate
+ls
+ls -la
+.venv/bin/activate
+.venv/bin/activate.csh
+.venv/bin/activate
+chmod +x .venv/bin/activate
+.venv/bin/activate
+ls -l
+sudo apt update && sudo apt install -y python3-venv
+witch python3
+echo $VIRTUAL_ENV
+. .venv/bin/activate
+cls
+clear
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 -port 8080
+uvicorn main:app --host 0.0.0.0 --port 8080
+clear
+incus profile show app
+incus profile show lb
+ls -lR /srv
+cat /srv/app/main.py
+clear
+incus list
+incus exec app1 -- systemctl list-unists --type=service --state=running --no-pager
+incus exec app1 -- systemctl list-unit --type=service --state=running --no-pager
+incus exec app1 -- systemctl list-units --type=service --state=running --no-pager
+incus exec app1 -- systemctl cat app
+curl -s 10.10.10.21:8080; curl -s 10.10.10.22:8080
+clear
+curl -s 10.10.10.21:8080
+clear
+curl -s 10.10.10.22:8080
+clear
+for i in 1 2 3 4; do curl 10.10.10.11 | grep "app"; echo; done
+for i in 1 2 3 4; do curl -s 10.10.10.11 | grep "hostname"; echo; done
+for i in 1 2 3 4; do curl -s 10.10.10.11 | grep "app"; echo; done
+for i in 1 2 3 4; do curl -s 10.10.10.11 | grep ">app"; echo; done
+clear
+for i in 1 2 3 4; do curl -s 10.10.10.11 | grep ">app"; echo; done
+cat /root/.ash_history
+cat ~/.ash_history
