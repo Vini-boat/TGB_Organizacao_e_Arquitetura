@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hostname</title>
+  <title>Placar</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -11,6 +11,7 @@
       --text: #e2e8f0;
       --muted: #94a3b8;
       --accent: #38bdf8;
+      --erro: #f87171;
     }
     * { box-sizing: border-box; }
     body {
@@ -28,6 +29,7 @@
       border-radius: 12px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .35);
       text-align: center;
+      min-width: 22rem;
     }
     .label {
       margin: 0 0 .5rem;
@@ -36,18 +38,67 @@
       text-transform: uppercase;
       letter-spacing: .1em;
     }
-    .hostname {
-      margin: 0;
+    .hostname, .total {
+      margin: 0 0 1.5rem;
       color: var(--accent);
       font-family: ui-monospace, "Cascadia Code", monospace;
       font-size: 2.2rem;
     }
+    .mono { font-family: ui-monospace, "Cascadia Code", monospace; }
+    .erro { color: var(--erro); font-weight: bold; }
+    button {
+      background: var(--accent);
+      color: var(--bg);
+      border: 0;
+      border-radius: 8px;
+      padding: .6rem 1.4rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    ol { list-style: none; padding: 0; margin: 1.5rem 0 0; color: var(--muted); }
   </style>
 </head>
 <body>
   <main class="card">
     <p class="label">Servidor</p>
     <h1 class="hostname">{{ hostname }}</h1>
+
+    <p class="label">Cliques</p>
+    <p class="total" id="total">–</p>
+
+    <p><button onclick="clicar()">Clicar</button>
+       <label><input type="checkbox" id="auto"> automático</label></p>
+
+    <p id="status" class="mono">–</p>
+    <ol id="ultimos" class="mono"></ol>
   </main>
+
+  <script>
+    async function atualizar() {
+      const status = document.getElementById("status");
+      try {
+        const r = await fetch("/api/estado");
+        const e = await r.json();
+        if (!r.ok) throw e;
+        status.className = "mono";
+        status.textContent = `atendido por ${e.app} • banco ${e.banco}`;
+        document.getElementById("total").textContent = e.total;
+        document.getElementById("ultimos").innerHTML =
+          e.ultimos.map(([hora, app, banco]) => `<li>${hora}  ${app} → ${banco}</li>`).join("");
+      } catch (e) {
+        status.className = "mono erro";
+        status.textContent = `atendido por ${e.app ?? "?"} • banco indisponível`;
+      }
+    }
+
+    async function clicar() {
+      await fetch("/clique", { method: "POST" });
+      atualizar();
+    }
+
+    setInterval(atualizar, 1000);
+    setInterval(() => document.getElementById("auto").checked && clicar(), 500);
+    atualizar();
+  </script>
 </body>
 </html>

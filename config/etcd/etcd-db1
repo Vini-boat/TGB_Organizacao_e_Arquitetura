@@ -1,0 +1,10 @@
+# etcd do db1 (lido pelo etcd.service via /etc/default/etcd) (fundador: o cluster nasce com db1 e lb1)
+ETCD_NAME="db1"
+ETCD_DATA_DIR="/var/lib/etcd/tgb"
+ETCD_INITIAL_CLUSTER="db1=http://10.10.10.31:2380,lb1=http://10.10.10.11:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="tgb"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_LISTEN_PEER_URLS="http://10.10.10.31:2380"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://10.10.10.31:2380"
+ETCD_LISTEN_CLIENT_URLS="http://10.10.10.31:2379,http://127.0.0.1:2379"
+ETCD_ADVERTISE_CLIENT_URLS="http://10.10.10.31:2379"
