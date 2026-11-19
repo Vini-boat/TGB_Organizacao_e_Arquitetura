@@ -9,8 +9,3 @@ ln -sf /srv/lb/keepalived.conf /etc/keepalived/keepalived.conf
 keepalived -t -f /etc/keepalived/keepalived.conf
 systemctl enable keepalived
 systemctl restart keepalived
-
-# Só no lb1: tem o perfil etcd (3º voto) e por isso enxerga /srv/etcd/etcd-lb1.
-if [ -f /srv/etcd/etcd-$(hostname) ]; then
-    bash /srv/etcd/setup.sh
-fi

@@ -1,16 +1,18 @@
 #!/bin/bash
 # Instala e liga o etcd deste contêiner com o arquivo /srv/etcd/etcd-<hostname>.
-# Chamado pelo setup.sh do db (db1, db2) e do lb (só o lb1 tem o perfil etcd).
+# Roda nos votantes (db1, db2, lb1), que são os que têm o perfil etcd.
 set -e
-. /srv/etcd/etcd-$(hostname)   # ETCD_NAME, ETCD_DATA_DIR, ETCD_INITIAL_CLUSTER_STATE...
+H=$(hostname)
+. /srv/etcd/etcd-$H   # ETCD_NAME, ETCD_DATA_DIR, ETCD_INITIAL_CLUSTER_STATE...
 
+apt update
 apt install -y etcd-server etcd-client curl
 
 # O pacote sobe um etcd de um membro só, em outra pasta: para e apaga (a nossa é a "tgb").
 systemctl stop etcd
 find /var/lib/etcd -mindepth 1 -maxdepth 1 ! -name tgb -exec rm -rf {} +
 
-ln -sf /srv/etcd/etcd-$(hostname) /etc/default/etcd
+ln -sf /srv/etcd/etcd-$H /etc/default/etcd
 
 # Membro que entra num cluster já existente (db2): os outros aprovam a entrada antes.
 if [ "$ETCD_INITIAL_CLUSTER_STATE" = existing ] && [ ! -d "$ETCD_DATA_DIR" ]; then

@@ -79,6 +79,7 @@
       try {
         const r = await fetch("/api/estado");
         const e = await r.json();
+        document.querySelector(".hostname").textContent = e.app;
         if (!r.ok) throw e;
         status.className = "mono";
         status.textContent = `atendido por ${e.app} • banco ${e.banco}`;

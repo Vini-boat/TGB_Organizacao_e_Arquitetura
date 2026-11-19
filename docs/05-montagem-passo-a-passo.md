@@ -707,15 +707,14 @@ Em `evidencias/fase2/`:
 
 Ordem da fase: **`db1` + etcd do `lb1`** → **placar no app** → **`db2`**. O cluster do etcd
 **nasce com 2 membros** (`db1` e `lb1`) e o `db2` é **adicionado** no fim; o Patroni do
-`db2` copia os dados sozinho. Cada contêiner roda **só o `setup.sh`**: os scripts escolhem
-os arquivos pelo nome do contêiner (`hostname`), sem nenhum `ln` à mão.
+`db2` copia os dados sozinho. Os votantes rodam o `etcd/setup.sh` e os `db` rodam também o `db/setup.sh`:
+os scripts escolhem os arquivos pelo nome do contêiner (`hostname`), sem nenhum `ln` à mão.
 
 | Arquivo (`config/` → `/srv/` na VM) | Contêineres | Para quê |
 |---|---|---|
 | `etcd/etcd-db1`, `etcd-db2`, `etcd-lb1` | `db1`, `db2`, `lb1` (perfil `etcd`) | configuração do etcd de cada votante |
 | `etcd/setup.sh` | `db1`, `db2`, `lb1` | instala o etcd, liga o `etcd-<hostname>` e espera a maioria |
-| `db/setup.sh` | `db1`, `db2` | instala PostgreSQL e Patroni, chama o `etcd/setup.sh` e liga o `patroni-<hostname>.yml` |
-| `lb/setup.sh` | `lb1`, `lb2` | HAProxy + keepalived; no `lb1` (que tem `/srv/etcd`) chama o `etcd/setup.sh` |
+| `db/setup.sh` | `db1`, `db2` | instala PostgreSQL e Patroni e liga o `patroni-<hostname>.yml` (depois do etcd) |
 | `db/patroni-db1.yml`, `patroni-db2.yml` | `db1`, `db2` (perfil `db`) | configuração do Patroni de cada `db` |
 | `db/placar.sql` | `db1` | cria o usuário, o banco e a tabela do placar |
 | `lb/haproxy.cfg` (bloco `postgres`) | `lb1`, `lb2` | porta 5000 → primário |
@@ -734,7 +733,7 @@ E levar os arquivos novos e alterados (no Windows, na pasta do repositório):
 
 ```powershell
 scp -r config/db config/etcd incus-host:/srv/
-scp config/lb/haproxy.cfg config/lb/setup.sh incus-host:/srv/lb/
+scp config/lb/haproxy.cfg incus-host:/srv/lb/
 scp config/app/main.py config/app/setup.sh incus-host:/srv/app/
 scp config/app/templates/index.html incus-host:/srv/app/templates/
 ```
@@ -855,17 +854,17 @@ usou o caminho antigo da API (`/v3alpha`), que o etcd 3.4 não tem mais. Soluç�
 nasce só com `db1` e `lb1`, e o `db2` é **adicionado** quando existir (3.8). Print:
 `evidencias/fase3/problema-etcd-v3alpha.png`.
 
-Para recomeçar daquele estado (não há dados a perder: o Patroni nunca chegou a criar o banco):
+Para recomeçar daquele estado (não há dados a perder: o Patroni nunca chegou a criar o
+banco), o `db1` é apagado (com os snapshots dele) e o etcd do `lb1` perde a pasta de dados,
+que guardava o cluster de 3 membros. Os perfis `db` e `etcd` ficam:
 
 ```sh
-incus exec db1 -- systemctl disable --now patroni@16-main etcd
-incus exec db1 -- rm -rf /var/lib/etcd/tgb /var/lib/postgresql/16/tgb
-incus exec lb1 -- systemctl disable --now etcd
+incus delete db1 --force
+incus exec lb1 -- systemctl stop etcd
 incus exec lb1 -- rm -rf /var/lib/etcd/tgb
-incus snapshot delete db1 pacotes
 ```
 
-E copiar de novo a pasta `etcd` e os `setup.sh` (3.1). Quem está começando do zero pula
+E copiar de novo as pastas `etcd` e `db` (3.1). Quem está começando do zero pula
 esta seção.
 
 ### 3.4 `db1` e o 3º voto no `lb1`
@@ -882,25 +881,26 @@ incus exec lb1 -- ls /srv/lb /srv/etcd
 O `lb1` ganha o perfil `etcd` **ligado**: a pasta aparece na hora, e o `ls` mostra que o
 `/srv/lb` continua lá (é o problema do nome do device, 3.2).
 
-O etcd só funciona com **maioria**. Com os 2 fundadores, precisa dos 2 de pé, então os
-dois `setup.sh` rodam **ao mesmo tempo**, cada um numa janela da VM:
+O etcd só funciona com **maioria**. Com os 2 fundadores, precisa dos 2 de pé, então o
+`etcd/setup.sh` roda nos dois **ao mesmo tempo**, cada um numa janela da VM:
 
 ```sh
-incus exec lb1 -- bash /srv/lb/setup.sh
+incus exec lb1 -- bash /srv/etcd/setup.sh
 ```
 
 ```sh
-incus exec db1 -- bash /srv/db/setup.sh
+incus exec db1 -- bash /srv/etcd/setup.sh
 ```
 
-O do `lb1` refaz o HAProxy e o keepalived (o IP virtual pisca um instante) e, por ter o
-`/srv/etcd/etcd-lb1`, instala o etcd. Os dois param em `Esperando a maioria do etcd...`
-até o outro subir; aí seguem sozinhos.
+Os dois param em `Esperando a maioria do etcd...` até o outro subir; aí terminam com o
+`member list` mostrando `db1` e `lb1`. O script é um só: o `hostname` decide qual arquivo
+cada um lê.
 
-O [`etcd/setup.sh`](../config/etcd/setup.sh), chamado pelos dois:
+O [`etcd/setup.sh`](../config/etcd/setup.sh):
 
 ```sh
 . /srv/etcd/etcd-$(hostname)
+apt update
 apt install -y etcd-server etcd-client curl
 systemctl stop etcd
 find /var/lib/etcd -mindepth 1 -maxdepth 1 ! -name tgb -exec rm -rf {} +
@@ -924,6 +924,12 @@ etcdctl member list -w table
 | `start --no-block` | O etcd fica esperando a maioria antes de dizer ao systemd que subiu; sem o `--no-block` o script ficaria preso ali |
 | `until curl ... "etcdcluster":"3.4"` | Espera o cluster fechar a versão 3.4. Sem isso, o Patroni podia ver `3.0.0` e cair no erro da 3.3 |
 
+Com o etcd de pé, o PostgreSQL e o Patroni no `db1`:
+
+```sh
+incus exec db1 -- bash /srv/db/setup.sh
+```
+
 O [`db/setup.sh`](../config/db/setup.sh):
 
 ```sh
@@ -931,7 +937,6 @@ apt update
 apt install -y postgresql-16 patroni curl
 pg_dropcluster 16 main --stop 2>/dev/null || true
 systemctl disable --now postgresql
-bash /srv/etcd/setup.sh
 ln -sf /srv/db/patroni-$(hostname).yml /etc/patroni/16-main.yml
 systemctl enable patroni@16-main
 systemctl restart patroni@16-main
@@ -1071,10 +1076,11 @@ No Windows, <http://localhost:8080>: marcar **automático** e ver o total subir,
 incus init images:ubuntu/24.04 db2 --profile default --profile db --profile etcd
 incus config device override db2 eth0 ipv4.address=10.10.10.32
 incus start db2
+incus exec db2 -- bash /srv/etcd/setup.sh
 incus exec db2 -- bash /srv/db/setup.sh
 ```
 
-O mesmo `setup.sh` do `db1`, mas o `hostname` agora é `db2`:
+Os mesmos scripts do `db1`, mas o `hostname` agora é `db2`:
 
 | Etapa | O que acontece no `db2` |
 |---|---|
